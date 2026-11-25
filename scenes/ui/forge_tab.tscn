@@ -39,7 +39,7 @@ text = "BARROW BESTIARY"
 [node name="ForgeView" type="VBoxContainer" parent="VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 9
+theme_override_constants/separation = 10
 
 [node name="AnvilBanner" type="PanelContainer" parent="VBox/ForgeView"]
 layout_mode = 2
@@ -67,7 +67,7 @@ theme_override_constants/separation = 8
 
 [node name="WeaponTypeBox" type="VBoxContainer" parent="VBox/ForgeView"]
 layout_mode = 2
-theme_override_constants/separation = 5
+theme_override_constants/separation = 6
 
 [node name="WTypeHeaderLbl" type="Label" parent="VBox/ForgeView/WeaponTypeBox"]
 layout_mode = 2
@@ -90,7 +90,7 @@ layout_mode = 2
 
 [node name="CostVBox" type="VBoxContainer" parent="VBox/ForgeView/CostPanel"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 7
 
 [node name="CostLbl" type="Label" parent="VBox/ForgeView/CostPanel/CostVBox"]
 layout_mode = 2
@@ -103,17 +103,17 @@ text = "Your Coffers: 120 Gold · 24 Scrap"
 horizontal_alignment = 1
 
 [node name="ForgeBtn" type="Button" parent="VBox/ForgeView/CostPanel/CostVBox"]
-custom_minimum_size = Vector2(0, 58)
+custom_minimum_size = Vector2(0, 62)
 layout_mode = 2
 text = "FORGE RELIC"
 
 [node name="ResultPanel" type="PanelContainer" parent="VBox/ForgeView"]
 layout_mode = 2
-size_flags_vertical = 3
+size_flags_vertical = 1
 
 [node name="ResultVBox" type="VBoxContainer" parent="VBox/ForgeView/ResultPanel"]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 8
 
 [node name="ResultHeaderLbl" type="Label" parent="VBox/ForgeView/ResultPanel/ResultVBox"]
 layout_mode = 2
@@ -121,11 +121,11 @@ text = "ANVIL CHAMBER READY"
 
 [node name="ResultCardRow" type="HBoxContainer" parent="VBox/ForgeView/ResultPanel/ResultVBox"]
 layout_mode = 2
-size_flags_vertical = 6
+size_flags_vertical = 1
 theme_override_constants/separation = 14
 
 [node name="ResultIconFrame" type="PanelContainer" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow"]
-custom_minimum_size = Vector2(116, 116)
+custom_minimum_size = Vector2(106, 106)
 layout_mode = 2
 size_flags_vertical = 4
 
@@ -160,6 +160,57 @@ visible = false
 custom_minimum_size = Vector2(0, 48)
 layout_mode = 2
 text = "EQUIP NOW"
+
+[node name="OddsPanel" type="PanelContainer" parent="VBox/ForgeView"]
+custom_minimum_size = Vector2(0, 142)
+layout_mode = 2
+size_flags_vertical = 1
+
+[node name="OddsVBox" type="VBoxContainer" parent="VBox/ForgeView/OddsPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 8
+
+[node name="OddsHeaderLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
+layout_mode = 2
+text = "ANVIL COVENANT & RARITY ODDS"
+
+[node name="OddsRow" type="HBoxContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OddsRare" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RareLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsRare"]
+layout_mode = 2
+text = "RARE · 70%\n1 Barrow Affix"
+horizontal_alignment = 1
+
+[node name="OddsEpic" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EpicLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsEpic"]
+layout_mode = 2
+text = "EPIC · 21%\n2 Barrow Affixes"
+horizontal_alignment = 1
+
+[node name="OddsSov" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SovLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsSov"]
+layout_mode = 2
+text = "SOVEREIGN · 9%\n3 Barrow Affixes"
+horizontal_alignment = 1
+
+[node name="OddsFootLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
+layout_mode = 2
+text = "Forged relics enter your satchel immediately and can be tempered up to +5 at the Armory."
+horizontal_alignment = 1
+autowrap_mode = 3
 
 [node name="BestiaryView" type="VBoxContainer" parent="VBox"]
 visible = false

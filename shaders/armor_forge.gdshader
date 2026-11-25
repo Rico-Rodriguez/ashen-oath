@@ -94,62 +94,63 @@ void fragment() {
 	vec3 emit = has_emission_tex ? texture(emission_tex, UV).rgb * 1.6 : vec3(0.0);
 
 	if (armor_tier == TIER_WORN_IRON) {
-		vec3 worn_iron = mix(vec3(0.28, 0.25, 0.22), vec3(0.54, 0.50, 0.46), luma);
-		alb = mix(alb * 0.84, worn_iron + grit * 0.025, armor_mask * 0.62);
-		rgh = clamp(rgh + 0.16 * armor_mask + grit * 0.04, 0.25, 0.96);
-		met = clamp(met * 0.72 + 0.15 * armor_mask, 0.0, 0.78);
+		vec3 worn_iron = mix(vec3(0.24, 0.25, 0.27), vec3(0.50, 0.52, 0.55), luma);
+		alb = mix(alb * 0.84, worn_iron + grit * 0.028, armor_mask * 0.72);
+		rgh = clamp(rgh + 0.24 * armor_mask + grit * 0.04, 0.34, 0.94);
+		met = clamp(met * 0.64 + 0.12 * armor_mask, 0.0, 0.70);
 	} else if (armor_tier == TIER_BLACKENED_STEEL) {
-		vec3 blued_steel = mix(vec3(0.11, 0.13, 0.17), vec3(0.38, 0.43, 0.52), pow(clamp(luma * 1.25, 0.0, 1.0), 0.9));
-		alb = mix(alb * 0.72, blued_steel, armor_mask * 0.80);
-		rgh = mix(rgh, 0.24, armor_mask * 0.75);
-		met = max(met, 0.86 * armor_mask);
+		float edge_glint = clamp(length(fwidth(NORMAL)) * 1.45, 0.0, 0.36);
+		vec3 blued_steel = mix(vec3(0.08, 0.09, 0.12), vec3(0.32, 0.37, 0.45), pow(clamp(luma * 1.25, 0.0, 1.0), 0.9));
+		alb = mix(alb * 0.66, blued_steel + vec3(0.14, 0.17, 0.22) * edge_glint, armor_mask * 0.88);
+		rgh = mix(rgh, 0.22, armor_mask * 0.84);
+		met = max(met, 0.88 * armor_mask);
 	} else if (armor_tier == TIER_SOVEREIGN_PLATE) {
 		float plate_mask = has_metal_tex
 			? clamp(max(met * 1.35, smoothstep(0.55, 0.85, luma) * 0.14), 0.0, 1.0)
 			: smoothstep(0.55, 0.85, luma) * 0.14;
-		float n_curv = clamp(length(fwidth(NORMAL)) * 2.1, 0.0, 1.0);
-		float a_edge = clamp(length(fwidth(alb)) * 4.4, 0.0, 1.0);
+		float n_curv = clamp(length(fwidth(NORMAL)) * 2.4, 0.0, 1.0);
+		float a_edge = clamp(length(fwidth(alb)) * 4.2, 0.0, 1.0);
 		float edge_signal = has_metal_tex
-			? max(n_curv, a_edge) * mix(0.72, 1.18, plate_mask) + smoothstep(0.74, 0.94, luma) * plate_mask * 0.38
+			? max(n_curv, a_edge) * mix(0.75, 1.25, plate_mask) + smoothstep(0.74, 0.94, luma) * plate_mask * 0.35
 			: max(n_curv * 0.95, a_edge * 0.88);
-		float gold_trim = smoothstep(0.56, 0.84, edge_signal);
+		float gold_trim = smoothstep(0.42, 0.74, edge_signal);
 
-		vec3 royal_cloth = mix(vec3(0.009, 0.009, 0.013), vec3(0.026, 0.022, 0.032), luma);
-		vec3 royal_steel = mix(vec3(0.09, 0.10, 0.13), vec3(0.32, 0.35, 0.42), clamp(luma * 1.2, 0.0, 1.0));
-		vec3 royal_gold = vec3(0.92, 0.68, 0.22) * (0.78 + 0.34 * luma);
+		vec3 royal_cloth = mix(vec3(0.012, 0.012, 0.016), vec3(0.032, 0.028, 0.038), luma);
+		vec3 royal_steel = mix(vec3(0.09, 0.10, 0.14), vec3(0.34, 0.37, 0.44), clamp(luma * 1.2, 0.0, 1.0));
+		vec3 royal_gold = vec3(0.92, 0.68, 0.22) * (0.82 + 0.32 * luma);
 
 		float cloth_blend = (has_metal_tex && plate_mask > 0.35) ? 0.76 : 0.92;
 		vec3 base_surface = mix(mix(alb * 0.18, royal_cloth, cloth_blend), royal_steel, plate_mask);
 		alb = mix(base_surface, royal_gold, gold_trim);
 		rgh = mix(mix(rgh, 0.86, 1.0 - plate_mask), 0.23, plate_mask);
-		rgh = mix(rgh, 0.17, gold_trim);
+		rgh = mix(rgh, 0.18, gold_trim);
 		met = max(met * plate_mask, max(0.88 * plate_mask, 0.96 * gold_trim));
 		emit += royal_gold * gold_trim * 0.08;
 	} else {
 		float metal_armor = has_metal_tex ? clamp(met * 1.35, 0.0, 1.0) : 0.0;
-		vec3 charred_cloth = mix(vec3(0.007, 0.007, 0.009), vec3(0.022, 0.020, 0.024), luma);
-		vec3 charred_plate = mix(vec3(0.045, 0.045, 0.055), vec3(0.16, 0.15, 0.17), luma);
+		vec3 charred_cloth = mix(vec3(0.010, 0.010, 0.012), vec3(0.025, 0.022, 0.028), luma);
+		vec3 charred_plate = mix(vec3(0.036, 0.036, 0.044), vec3(0.14, 0.13, 0.16), luma);
 		vec3 charred = mix(charred_cloth, charred_plate, metal_armor);
 		alb = mix(alb * 0.14, charred, 0.92);
-		rgh = mix(0.86, 0.27, metal_armor);
-		met = mix(0.06, max(met, 0.86), metal_armor);
+		rgh = mix(0.86, 0.25, metal_armor);
+		met = mix(0.06, max(met, 0.88), metal_armor);
 
-		vec2 v_coarse = voronoi_fissure(UV * 11.5 + vec2(0.17, 0.43));
-		vec2 v_fine = voronoi_fissure(UV * 24.0 + vec2(1.31, 0.79));
-		float patch_n = value_noise(UV * 4.2 + vec2(2.1, 0.7)) * 0.65 + value_noise(UV * 9.0 + vec2(5.4, 3.2)) * 0.35;
-		float vein_patch = smoothstep(0.36, 0.66, patch_n);
-		float crack_core = smoothstep(0.018, 0.002, v_coarse.x);
-		float crack_web = smoothstep(0.013, 0.002, v_fine.x) * smoothstep(0.085, 0.008, v_coarse.x);
+		vec2 v_coarse = voronoi_fissure(UV * 4.4 + vec2(0.17, 0.43));
+		vec2 v_fine = voronoi_fissure(UV * 9.2 + vec2(1.31, 0.79));
+		float patch_n = value_noise(UV * 2.8 + vec2(2.1, 0.7)) * 0.65 + value_noise(UV * 5.6 + vec2(5.4, 3.2)) * 0.35;
+		float vein_patch = smoothstep(0.40, 0.68, patch_n);
+		float crack_core = smoothstep(0.022, 0.004, v_coarse.x);
+		float crack_web = smoothstep(0.015, 0.003, v_fine.x) * smoothstep(0.10, 0.01, v_coarse.x);
 		float surface_gate = has_metal_tex ? mix(0.15, 1.0, armor_mask) : 0.22;
 		if (has_metal_tex && metal_armor < 0.2) {
 			surface_gate = 0.22;
 		}
-		float fissure = clamp(crack_core + crack_web * 0.65, 0.0, 1.0) * vein_patch * surface_gate;
-		float pulse = 0.72 + 0.28 * sin(TIME * 3.1 + v_coarse.y);
-		vec3 hot_core = mix(ember_color, vec3(1.0, 0.84, 0.38), crack_core * 0.62);
-		alb = mix(alb, hot_core * 0.55, fissure * 0.80);
-		rgh = mix(rgh, 0.85, fissure * 0.5);
-		emit += hot_core * fissure * (4.4 * pulse);
+		float fissure = clamp(crack_core + crack_web * 0.48, 0.0, 1.0) * vein_patch * surface_gate;
+		float pulse = 0.76 + 0.24 * sin(TIME * 3.1 + v_coarse.y);
+		vec3 hot_core = mix(ember_color, vec3(1.0, 0.78, 0.30), crack_core * 0.56);
+		alb = mix(alb, hot_core * 0.52, fissure * 0.78);
+		rgh = mix(rgh, 0.82, fissure * 0.45);
+		emit += hot_core * fissure * (2.65 * pulse);
 	}
 
 	if (has_normal) {

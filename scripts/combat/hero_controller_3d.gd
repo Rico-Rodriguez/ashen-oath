@@ -32,6 +32,8 @@ var skill_1_cooldown_left: float = 0.0
 var skill_1_cooldown_max: float = 6.0
 var skill_2_cooldown_left: float = 0.0
 var skill_2_cooldown_max: float = 8.0
+var skill_3_cooldown_left: float = 0.0
+var skill_3_cooldown_max: float = 8.0
 
 var _is_dead: bool = false
 var _combo_toggle: bool = false
@@ -104,6 +106,7 @@ func setup(
 	dash_cooldown_left = 0.0
 	skill_1_cooldown_left = 0.0
 	skill_2_cooldown_left = 0.0
+	skill_3_cooldown_left = 0.0
 
 	_mount_visual()
 	_setup_weapon_vfx()
@@ -217,6 +220,8 @@ func _physics_process(delta: float) -> void:
 
 	velocity = move_dir * (stats.move_speed * speed_mult)
 	move_and_slide()
+	if move_dir.length_squared() > 0.0004:
+		_enforce_enemy_soft_separation()
 	_constrain_to_ground_and_bounds()
 
 	if _whirlwind_timer > 0.0:
@@ -253,6 +258,9 @@ func _tick_timers(delta: float) -> void:
 	if skill_2_cooldown_left > 0.0:
 		skill_2_cooldown_left = maxf(0.0, skill_2_cooldown_left - delta)
 		cd_dirty = true
+	if skill_3_cooldown_left > 0.0:
+		skill_3_cooldown_left = maxf(0.0, skill_3_cooldown_left - delta)
+		cd_dirty = true
 	if cd_dirty:
 		_emit_cooldowns()
 
@@ -285,6 +293,8 @@ func _poll_action_triggers() -> void:
 		trigger_skill_1()
 	if Input.is_action_just_pressed("skill_2"):
 		trigger_skill_2()
+	if Input.is_action_just_pressed("skill_3"):
+		trigger_skill_3()
 
 
 func _read_move_direction() -> Vector3:
@@ -315,7 +325,7 @@ func _try_auto_or_manual_attack() -> void:
 func _perform_primary_attack(target: Node3D) -> void:
 	_attack_cooldown = stats.attack_interval
 	_attack_strike_window = 0.14
-	_attack_anim_timer = minf(0.34, stats.attack_interval * 0.72)
+	_attack_anim_timer = minf(0.46, stats.attack_interval * 0.78)
 
 	var forward := _forward_dir()
 	if target != null and is_instance_valid(target):
@@ -387,6 +397,8 @@ func trigger_dash() -> bool:
 	if visual != null:
 		visual.rotation.y = 0.0
 		visual.play_anim("dash", 1.35, true)
+	if vfx != null and vfx.has_method("spawn_hit_sparks"):
+		vfx.call("spawn_hit_sparks", global_position + Vector3(0.0, 0.72, 0.0), Color(1.0, 0.48, 0.14), true)
 	var sfx_ev := class_def.dash_ability.sfx_event if class_def.dash_ability.sfx_event != "" else "dodge"
 	_play_sfx(sfx_ev)
 	_emit_cooldowns()
@@ -419,6 +431,19 @@ func trigger_skill_2() -> bool:
 	return true
 
 
+func trigger_skill_3() -> bool:
+	if _is_dead or stats == null or class_def == null or class_def.skill_3 == null:
+		return false
+	if skill_3_cooldown_left > 0.0 or _dash_timer > 0.0 or _charge_timer > 0.0:
+		return false
+
+	_recompute_cooldown_caps()
+	skill_3_cooldown_left = skill_3_cooldown_max
+	_execute_ability(class_def.skill_3)
+	_emit_cooldowns()
+	return true
+
+
 func _execute_ability(ab: AbilityDef) -> void:
 	match ab.ability_id:
 		"iron_tempest":
@@ -426,6 +451,9 @@ func _execute_ability(ab: AbilityDef) -> void:
 			_whirlwind_tick_timer = 0.0
 			_attack_strike_window = 0.0
 			_attack_anim_timer = 0.0
+			if visual != null and visual.is_unified_kit():
+				visual.rotation.y = 0.0
+				visual.play_anim("attack_whirl", 1.65, true)
 			_play_sfx("blades")
 			_whirlwind_pulse_cleave()
 			_whirlwind_tick_timer = 0.28
@@ -445,21 +473,28 @@ func _execute_ability(ab: AbilityDef) -> void:
 			_sweep_bulwark_charge_path()
 		"blackflame_pyre":
 			var radius := 3.5 * stats.cleave_size_mult
+			var is_slam := ab.anim_clip == "skill_slam"
 			var target_pos := _find_best_cluster_pos(10.0, radius)
 			var to_p := Vector3(target_pos.x - global_position.x, 0.0, target_pos.z - global_position.z)
 			if to_p.length_squared() > 0.0001:
 				_locked_attack_dir = to_p.normalized()
 				_face_direction_instant(_locked_attack_dir)
-			_skill_anim_timer = 0.34
+			_skill_anim_timer = 0.44 if is_slam else 0.34
 			if visual != null:
-				visual.play_anim("skill_cast", 1.25, true)
+				visual.play_anim("skill_slam" if is_slam else "skill_cast", 1.25, true)
 			_play_sfx("meteor")
+			if is_slam and director != null:
+				if director.has_method("add_camera_trauma"):
+					director.call("add_camera_trauma", 0.36)
+				if director.has_method("add_camera_kick"):
+					director.call("add_camera_kick", _locked_attack_dir, 0.28)
 			if vfx != null and vfx.has_method("spawn_blackflame_pyre"):
 				vfx.call("spawn_blackflame_pyre", target_pos, radius)
 			var blast_dmg := stats.attack_damage * ab.damage_mult
+			var slam_stagger := 0.85 if is_slam else 0.0
 			for enemy in _get_alive_enemies():
 				if _dist_xz(target_pos, enemy.global_position) <= radius + _enemy_radius(enemy):
-					deliver_hit_to_enemy(enemy, blast_dmg, "blackflame_pyre", DamageEvent.Kind.FIRE)
+					deliver_hit_to_enemy(enemy, blast_dmg, "blackflame_pyre", DamageEvent.Kind.FIRE, slam_stagger)
 			_pyre_zones.append({
 				"pos": target_pos,
 				"radius": radius,
@@ -481,10 +516,12 @@ func _execute_ability(ab: AbilityDef) -> void:
 					points.append(e.global_position + Vector3(0.0, 1.05, 0.0))
 			else:
 				points.append(origin + _forward_dir() * 6.0)
-			_skill_anim_timer = 0.30
+			_skill_anim_timer = 0.34
 			if visual != null:
 				visual.play_anim("skill_cast", 1.35, true)
 			_play_sfx("chain")
+			if director != null and director.has_method("add_camera_trauma"):
+				director.call("add_camera_trauma", 0.22)
 			if vfx != null and vfx.has_method("spawn_chain_lightning"):
 				vfx.call("spawn_chain_lightning", points)
 			var arc_dmg := stats.attack_damage * ab.damage_mult
@@ -547,8 +584,12 @@ func _execute_ability(ab: AbilityDef) -> void:
 func _tick_whirlwind(delta: float) -> void:
 	_whirlwind_timer = maxf(0.0, _whirlwind_timer - delta)
 	if visual != null:
-		visual.rotation.y = wrapf(visual.rotation.y + TAU * 3.0 * delta, -PI, PI)
-		visual.play_anim("attack", 1.75, false)
+		if visual.is_unified_kit():
+			visual.rotation.y = 0.0
+			visual.play_anim("attack_whirl", 1.65, false)
+		else:
+			visual.rotation.y = wrapf(visual.rotation.y + TAU * 3.0 * delta, -PI, PI)
+			visual.play_anim("attack", 1.75, false)
 
 	_whirlwind_tick_timer -= delta
 	if _whirlwind_tick_timer <= 0.0:
@@ -559,8 +600,12 @@ func _tick_whirlwind(delta: float) -> void:
 func _whirlwind_pulse_cleave() -> void:
 	var radius := 3.6 * stats.cleave_size_mult
 	var tick_dmg := stats.attack_damage * (class_def.skill_1.damage_mult if class_def != null and class_def.skill_1 != null else 2.1) * 0.42
-	if vfx != null and vfx.has_method("spawn_shockwave_ring"):
-		vfx.call("spawn_shockwave_ring", global_position, radius * 0.85, Color(1.0, 0.52, 0.16, 0.9))
+	if vfx != null:
+		if vfx.has_method("spawn_shockwave_ring"):
+			vfx.call("spawn_shockwave_ring", global_position, radius * 0.85, Color(1.0, 0.52, 0.16, 0.9))
+		if vfx.has_method("spawn_hit_sparks"):
+			var tip_p := visual.get_blade_tip_global() if visual != null else (global_position + Vector3(1.5, 0.4, 0.0))
+			vfx.call("spawn_hit_sparks", Vector3(tip_p.x, 0.25, tip_p.z), Color(1.0, 0.62, 0.18), true)
 	_play_sfx("swing", -3.0, 1.12)
 	for enemy in _get_alive_enemies():
 		if _dist_xz(global_position, enemy.global_position) <= radius + _enemy_radius(enemy):
@@ -655,6 +700,22 @@ func deliver_hit_to_enemy(
 	ev.bleed_dps = bleed_dps
 	ev.bleed_duration = bleed_dur
 
+	var kb_dir := Vector3(enemy.global_position.x - global_position.x, 0.0, enemy.global_position.z - global_position.z)
+	kb_dir = kb_dir.normalized() if kb_dir.length_squared() > 0.0001 else _forward_dir()
+	var kb_speed := 0.0
+	if triggers_on_hit:
+		match source_id:
+			"bulwark_charge":
+				kb_speed = 6.4
+			"blackflame_pyre", "reaping_sweep":
+				kb_speed = 5.6
+			"iron_tempest":
+				kb_speed = 4.2
+			"primary":
+				kb_speed = 5.2
+	if kb_speed > 0.0:
+		ev.knockback_impulse = kb_dir * kb_speed
+
 	if triggers_on_hit and stats.spark_burn_dps > 0.0:
 		ev.burn_dps += stats.spark_burn_dps
 		ev.burn_duration = maxf(ev.burn_duration, 2.5)
@@ -669,6 +730,15 @@ func deliver_hit_to_enemy(
 		var ad := _audio()
 		if ad != null:
 			ad.call("haptic", "heavy" if is_crit else "medium")
+
+		var killed := enemy.has_method("is_dead") and bool(enemy.call("is_dead"))
+		var heavy_skill := source_id in ["blackflame_pyre", "stormbrand_arc", "reaping_sweep", "bulwark_charge"]
+		if director != null:
+			if is_crit or heavy_skill or killed:
+				if director.has_method("trigger_hitstop"):
+					director.call("trigger_hitstop", 0.036)
+				if director.has_method("add_camera_kick"):
+					director.call("add_camera_kick", kb_dir, 0.24 if (is_crit or heavy_skill) else 0.16)
 
 		if stats.life_on_hit > 0.0:
 			heal(stats.life_on_hit)
@@ -866,6 +936,18 @@ func _recompute_cooldown_caps() -> void:
 	dash_cooldown_max = (class_def.dash_ability.cooldown_sec if class_def != null and class_def.dash_ability != null else 3.0) * scale_cd
 	skill_1_cooldown_max = (class_def.skill_1.cooldown_sec if class_def != null and class_def.skill_1 != null else 6.5) * scale_cd
 	skill_2_cooldown_max = (class_def.skill_2.cooldown_sec if class_def != null and class_def.skill_2 != null else 8.0) * scale_cd
+	skill_3_cooldown_max = (class_def.skill_3.cooldown_sec if class_def != null and class_def.skill_3 != null else 8.0) * scale_cd
+
+
+func _enforce_enemy_soft_separation() -> void:
+	for enemy in _get_alive_enemies():
+		var min_sep := body_radius + _enemy_radius(enemy) + 0.15
+		var delta_xz := Vector3(global_position.x - enemy.global_position.x, 0.0, global_position.z - enemy.global_position.z)
+		var d := delta_xz.length()
+		if d > 0.001 and d < min_sep:
+			var push := (delta_xz / d) * (min_sep - d) * 0.55
+			global_position.x += push.x
+			global_position.z += push.z
 
 
 func _emit_cooldowns() -> void:

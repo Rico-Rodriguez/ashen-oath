@@ -23,8 +23,8 @@ const WARD_CYAN := Color("#2e8bc0")
 
 const BESTIARY_NOTES := {
 	"barrow_troll": {
-		"lore": "Swollen on grave-tallow beneath the Fringe cairns, Gravemaw swings shattered watchstones like iron mauls.",
-		"tip": "Telegraph: Heavy overhead slam casts a crimson ring. Roll past his flank before the club lands.",
+		"lore": "Lord of the Ashen Nave, Vaelor guards the barrow ossuary in blackened Sovereign plate and a smoldering ember-forged greatsword.",
+		"tip": "Telegraph: Heavy overhead slam casts a crimson ring. Roll past his flank before the blade lands.",
 	},
 	"blight_werewolf": {
 		"lore": "Once the Houndmaster of the Weald, fused with rot-spores that pulse emerald venom through torn sinew.",
@@ -39,20 +39,20 @@ const BESTIARY_NOTES := {
 		"tip": "Telegraph: Scrapes hoof for a gore-charge, then cleaves wide. Bait the charge into open stone.",
 	},
 	"hollow_ghoul": {
-		"lore": "Starved oath-thralls clawing from shallow barrow-mud whenever warm blood nears the cairns.",
-		"tip": "Telegraph: Short lunge windup in packs. Wide cleave arcs shatter whole clusters at once.",
+		"lore": "Risen oath-sworn footmen in battered iron kettles and grave-cloth, swarming relentlessly from the nave shadows.",
+		"tip": "Telegraph: Short cleaver windup in packs. Wide cleave arcs shatter whole clusters at once.",
 	},
 	"crypt_batlord": {
-		"lore": "Blind vault-stalkers that drink lantern warmth and hurl coagulated blood-bolts from afar.",
-		"tip": "Telegraph: Hovers still while charging ranged bolts. Strafe perpendicular or close distance fast.",
+		"lore": "Crimson-cowled cultists wearing forged iron death-masks, hurling searing blackflame bolts from wrought brazier staves.",
+		"tip": "Telegraph: Raises brazier staff while charging cinder bolts. Strafe perpendicular or close distance fast.",
 	},
 	"ash_scorpion": {
 		"lore": "Chitinous cinder-skitterers nesting in hot ash vents, armored against glancing blows.",
 		"tip": "Telegraph: Arches stinger tail bright orange before scuttling forward in a rapid strike.",
 	},
 	"stone_gargoyle": {
-		"lore": " Bastion sentinels carved from cursed granite, heavy-limbed and shrugging off light blades.",
-		"tip": "Telegraph: Slow crushing two-hand bash. Strike during recovery after its stone fists hit ground.",
+		"lore": "Cathedral sentinels clad in horned gunmetal barbutes, anchoring the nave with sweeping poleaxe halberd strikes.",
+		"tip": "Telegraph: Slow crushing two-hand halberd sweep. Strike during recovery after the blade slams down.",
 	},
 }
 
@@ -61,6 +61,14 @@ static var _font_body_med: FontFile = null
 static var _font_body_bold: FontFile = null
 static var _theme_cache: Theme = null
 static var _tex_cache: Dictionary = {}
+
+
+static func clear_cache() -> void:
+	_tex_cache.clear()
+	_theme_cache = null
+	_font_cinzel = null
+	_font_body_med = null
+	_font_body_bold = null
 
 
 static func get_theme() -> Theme:
@@ -118,6 +126,46 @@ static func get_ui_icon(icon_name: String) -> Texture2D:
 	return _load_tex("res://assets/sprites/icons/%s.png" % icon_name)
 
 
+static func get_skill_icon(ability_id: String) -> Texture2D:
+	var mapped := ability_id
+	match ability_id:
+		"reaping_sweep":
+			mapped = "iron_tempest"
+		"wraith_lances":
+			mapped = "stormbrand_arc"
+		"phase_blink", "shadow_step":
+			mapped = "iron_roll"
+	var tex := _load_tex("res://assets/sprites/ui/skills/%s.png" % mapped)
+	if tex != null:
+		return tex
+	return _load_tex("res://assets/sprites/ui/skills/iron_tempest.png")
+
+
+static func get_safe_margins(viewport_node: Control) -> Dictionary:
+	var top := 0
+	var bottom := 0
+	var left := 0
+	var right := 0
+	var win_size := DisplayServer.window_get_size()
+	var safe := DisplayServer.get_display_safe_area()
+	var vp_size := Vector2(720.0, 1280.0)
+	if viewport_node != null and viewport_node.get_viewport() != null:
+		var r := viewport_node.get_viewport().get_visible_rect()
+		if r.size.x > 0.0 and r.size.y > 0.0:
+			vp_size = r.size
+	if win_size.x > 0 and win_size.y > 0 and safe.size.x > 0 and safe.size.y > 0:
+		var sx := vp_size.x / float(win_size.x)
+		var sy := vp_size.y / float(win_size.y)
+		left = maxi(0, ceili(float(safe.position.x) * sx))
+		top = maxi(0, ceili(float(safe.position.y) * sy))
+		right = maxi(0, ceili(float(win_size.x - safe.end.x) * sx))
+		bottom = maxi(0, ceili(float(win_size.y - safe.end.y) * sy))
+	if OS.get_name() == "iOS":
+		top = maxi(top, 46)
+		bottom = maxi(bottom, 24)
+	return {"top": top, "bottom": bottom, "left": left, "right": right}
+
+
 static func _load_tex(path: String) -> Texture2D:
 	if _tex_cache.has(path):
 		return _tex_cache[path] as Texture2D
@@ -126,6 +174,12 @@ static func _load_tex(path: String) -> Texture2D:
 		if t != null:
 			_tex_cache[path] = t
 			return t
+	if FileAccess.file_exists(path):
+		var img := Image.load_from_file(ProjectSettings.globalize_path(path))
+		if img != null and not img.is_empty():
+			var itex := ImageTexture.create_from_image(img)
+			_tex_cache[path] = itex
+			return itex
 	return null
 
 

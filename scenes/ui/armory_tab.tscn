@@ -22,6 +22,7 @@ layout_mode = 2
 theme_override_constants/separation = 7
 
 [node name="ClassRow" type="HBoxContainer" parent="VBox"]
+visible = false
 layout_mode = 2
 theme_override_constants/separation = 8
 
@@ -33,8 +34,9 @@ layout_mode = 2
 theme_override_constants/separation = 6
 
 [node name="PaperDollRow" type="HBoxContainer" parent="VBox"]
-custom_minimum_size = Vector2(0, 310)
+custom_minimum_size = Vector2(0, 440)
 layout_mode = 2
+size_flags_vertical = 3
 theme_override_constants/separation = 10
 
 [node name="LeftSockets" type="VBoxContainer" parent="VBox/PaperDollRow"]
@@ -44,9 +46,9 @@ theme_override_constants/separation = 10
 
 [node name="SanctuaryStage3D" parent="VBox/PaperDollRow" instance=ExtResource("2")]
 layout_mode = 2
-camera_distance = 3.55
-camera_height = 1.44
-look_height = 1.02
+camera_distance = 4.75
+camera_height = 1.62
+look_height = 1.24
 
 [node name="RightSockets" type="VBoxContainer" parent="VBox/PaperDollRow"]
 custom_minimum_size = Vector2(126, 0)
@@ -54,7 +56,7 @@ layout_mode = 2
 theme_override_constants/separation = 10
 
 [node name="InspectorPanel" type="PanelContainer" parent="VBox"]
-custom_minimum_size = Vector2(0, 212)
+custom_minimum_size = Vector2(0, 224)
 layout_mode = 2
 
 [node name="InspVBox" type="VBoxContainer" parent="VBox/InspectorPanel"]
@@ -141,8 +143,8 @@ size_flags_horizontal = 3
 text = "SALVAGE COMMON"
 
 [node name="BagPanel" type="PanelContainer" parent="VBox"]
+custom_minimum_size = Vector2(0, 276)
 layout_mode = 2
-size_flags_vertical = 3
 
 [node name="BagVBox" type="VBoxContainer" parent="VBox/BagPanel"]
 layout_mode = 2

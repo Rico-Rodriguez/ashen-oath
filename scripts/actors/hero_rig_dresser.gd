@@ -95,18 +95,22 @@ static func dress(
 		visual.anim_player.seek(0.0, true)
 		visual.anim_player.advance(0.0)
 
-	if cid == "battlemage":
+	if cid == "battlemage" and skel.find_bone("weapon_r") < 0:
 		_suppress_plague_builtin_staff(
 			skel,
 			weapon_key != "" and weapon_key != "none",
 			offhand_key != "" and offhand_key != "none"
 		)
 
-	var armor_mats := _apply_armor_forge_shader(visual.model_instance, tier)
-	var cloth_mats: Array[ShaderMaterial] = []
-
 	var skel_world_scale := maxf(skel.global_transform.basis.get_scale().y, 0.0001)
 	var inv_skel_scale := 1.0 / skel_world_scale
+
+	if skel.find_bone("weapon_r") >= 0:
+		_dress_unified_kit(visual, skel, tier, weapon_key, lantern_color, inv_skel_scale)
+		return
+
+	var armor_mats := _apply_armor_forge_shader(visual.model_instance, tier)
+	var cloth_mats: Array[ShaderMaterial] = []
 	var bones: Dictionary = CLASS_BONES[cid]
 	var sockets := _extract_sockets(visual.anim_player)
 
@@ -610,3 +614,193 @@ static func _mount_fallback_cast_origin(
 		m.position = (sock["xf"] as Transform3D).origin + Vector3(0.0, 0.08 * inv_skel_scale, 0.0)
 	ba.add_child(m)
 	visual.cast_origin_marker = m
+
+
+static func _dress_unified_kit(
+	visual: ActorVisual,
+	skel: Skeleton3D,
+	tier: int,
+	weapon_key: String,
+	lantern_color: Color,
+	inv_skel_scale: float
+) -> void:
+	var armor_shader := load(ARMOR_SHADER_PATH) as Shader
+	var cloak_shader := load(CLOAK_SHADER_PATH) as Shader
+	var armor_mats: Array[ShaderMaterial] = []
+	var cloth_mats: Array[ShaderMaterial] = []
+	var std_mats: Array[StandardMaterial3D] = []
+
+	var cape_base := Color(0.11, 0.12, 0.16)
+	var cape_trim := Color(0.32, 0.28, 0.23)
+	var plume_col := Color(0.60, 0.57, 0.52)
+	var trim_col := Color(0.52, 0.50, 0.46)
+	var trim_metal := 0.80
+	var trim_rough := 0.36
+	match tier:
+		2:
+			cape_base = Color(0.08, 0.10, 0.14)
+			cape_trim = Color(0.34, 0.38, 0.46)
+			plume_col = Color(0.70, 0.68, 0.64)
+			trim_col = Color(0.54, 0.58, 0.64)
+			trim_metal = 0.90
+			trim_rough = 0.24
+		3:
+			cape_base = Color(0.18, 0.06, 0.08)
+			cape_trim = Color(0.84, 0.64, 0.22)
+			plume_col = Color(0.80, 0.74, 0.62)
+			trim_col = Color(0.94, 0.72, 0.24)
+			trim_metal = 0.94
+			trim_rough = 0.20
+		4:
+			cape_base = Color(0.065, 0.058, 0.062)
+			cape_trim = Color(0.74, 0.28, 0.08)
+			plume_col = Color(0.46, 0.10, 0.08)
+			trim_col = Color(0.86, 0.48, 0.16)
+			trim_metal = 0.92
+			trim_rough = 0.24
+
+	for n in visual.model_instance.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if not ActorVisual._is_visible_in_hierarchy(mi, visual.model_instance) or mi.mesh == null:
+			continue
+		if not mi.has_meta("_orig_std_mats"):
+			var cached := []
+			for s in mi.mesh.get_surface_count():
+				cached.append(mi.get_active_material(s))
+			mi.set_meta("_orig_std_mats", cached)
+
+		var orig_list: Array = mi.get_meta("_orig_std_mats")
+		for s in mi.mesh.get_surface_count():
+			var orig_mat: Material = orig_list[s] if s < orig_list.size() else null
+			var mname := orig_mat.resource_name if orig_mat != null else ""
+
+			if mname == "ArmorPlate" and armor_shader != null:
+				var smat := _make_armor_shader_mat(armor_shader, orig_mat, tier)
+				mi.set_surface_override_material(s, smat)
+				armor_mats.append(smat)
+			elif mname in ["CapeCloth", "TabardCloth", "HelmPlume"] and cloak_shader != null:
+				var cmat := ShaderMaterial.new()
+				cmat.shader = cloak_shader
+				var base_c := cape_base if mname != "HelmPlume" else plume_col
+				var ash_c := base_c.darkened(0.55)
+				var tr_c := cape_trim if mname != "HelmPlume" else plume_col.darkened(0.28)
+				cmat.set_shader_parameter("cloth_color", base_c)
+				cmat.set_shader_parameter("hem_ash_color", ash_c)
+				cmat.set_shader_parameter("trim_color", tr_c)
+				cmat.set_shader_parameter("sway_amplitude", 0.085 if mname == "CapeCloth" else 0.0)
+				mi.set_surface_override_material(s, cmat)
+				cloth_mats.append(cmat)
+			elif mname == "LanternCore":
+				var lmat := StandardMaterial3D.new()
+				lmat.albedo_color = lantern_color.lightened(0.35)
+				lmat.roughness = 0.16
+				lmat.emission_enabled = true
+				lmat.emission = lantern_color
+				lmat.emission_energy_multiplier = 3.2
+				mi.set_surface_override_material(s, lmat)
+			elif mname == "ArmorTrim":
+				var tmat := StandardMaterial3D.new()
+				tmat.albedo_color = trim_col
+				tmat.metallic = trim_metal
+				tmat.roughness = trim_rough
+				if tier == 4:
+					tmat.emission_enabled = true
+					tmat.emission = Color(0.85, 0.32, 0.08)
+					tmat.emission_energy_multiplier = 0.16
+				mi.set_surface_override_material(s, tmat)
+				std_mats.append(tmat)
+			elif mname == "WeaponSteel":
+				var wmat: StandardMaterial3D = (orig_mat as StandardMaterial3D).duplicate() as StandardMaterial3D if orig_mat is StandardMaterial3D else StandardMaterial3D.new()
+				if weapon_key == "blade_oarimaar":
+					wmat.albedo_color = Color(0.45, 0.44, 0.48)
+					wmat.metallic = 0.96
+					wmat.roughness = 0.18
+					wmat.emission_enabled = true
+					wmat.emission = Color(0.88, 0.30, 0.08)
+					wmat.emission_energy_multiplier = 0.25
+				else:
+					wmat.albedo_color = Color(0.95, 0.96, 1.0)
+					wmat.metallic = 0.95
+					wmat.roughness = 0.20
+				mi.set_surface_override_material(s, wmat)
+				std_mats.append(wmat)
+			elif orig_mat is StandardMaterial3D:
+				var dup := (orig_mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+				mi.set_surface_override_material(s, dup)
+				if not dup.emission_enabled:
+					std_mats.append(dup)
+
+	var weapon_idx := skel.find_bone("weapon_r")
+	if weapon_idx >= 0:
+		var ba_w := _make_bone_attachment(skel, "KitWeaponR", "weapon_r")
+		if ba_w != null:
+			var rest_inv := skel.get_bone_global_rest(weapon_idx).affine_inverse()
+			var base_m := Marker3D.new()
+			base_m.name = "BladeBase"
+			base_m.position = rest_inv * Vector3(-0.322, 0.855, 0.068 + 0.12)
+			ba_w.add_child(base_m)
+
+			var tip_m := Marker3D.new()
+			tip_m.name = "BladeTip"
+			tip_m.position = rest_inv * Vector3(-0.322, 0.855, 0.068 + 1.36)
+			ba_w.add_child(tip_m)
+
+			visual.main_weapon_node = base_m
+			visual.blade_tip_marker = tip_m
+
+	var hand_l_idx := skel.find_bone("hand_l")
+	if hand_l_idx >= 0:
+		var ba_l := _make_bone_attachment(skel, "KitCastHandL", "hand_l")
+		if ba_l != null:
+			var rest_inv := skel.get_bone_global_rest(hand_l_idx).affine_inverse()
+			var cast_m := Marker3D.new()
+			cast_m.name = "CastOrigin"
+			cast_m.position = rest_inv * Vector3(0.320, 0.84, 0.10)
+			ba_l.add_child(cast_m)
+			visual.cast_origin_marker = cast_m
+
+	var lantern_idx := skel.find_bone("lantern_bone")
+	if lantern_idx >= 0:
+		var ba_lt := _make_bone_attachment(skel, "KitLanternLight", "lantern_bone")
+		if ba_lt != null:
+			var rest_inv := skel.get_bone_global_rest(lantern_idx).affine_inverse()
+			var light := OmniLight3D.new()
+			light.name = "LanternLight"
+			light.light_color = lantern_color
+			light.omni_range = 4.6
+			light.light_energy = 1.65
+			light.shadow_enabled = false
+			light.position = rest_inv * Vector3(0.205, 0.838, 0.085)
+			ba_lt.add_child(light)
+
+	visual.register_shader_materials(armor_mats, cloth_mats, std_mats)
+
+
+static func _make_armor_shader_mat(shader: Shader, orig_mat: Material, tier: int) -> ShaderMaterial:
+	var smat := ShaderMaterial.new()
+	smat.shader = shader
+	smat.set_shader_parameter("armor_tier", tier)
+	smat.set_shader_parameter("hit_flash", 0.0)
+	if orig_mat is StandardMaterial3D:
+		var std := orig_mat as StandardMaterial3D
+		smat.set_shader_parameter("albedo_color", std.albedo_color)
+		if std.albedo_texture != null:
+			smat.set_shader_parameter("albedo_tex", std.albedo_texture)
+		smat.set_shader_parameter("has_normal", std.normal_enabled and std.normal_texture != null)
+		if std.normal_texture != null:
+			smat.set_shader_parameter("normal_tex", std.normal_texture)
+			smat.set_shader_parameter("normal_scale", std.normal_scale)
+		smat.set_shader_parameter("has_rough_tex", std.roughness_texture != null)
+		if std.roughness_texture != null:
+			smat.set_shader_parameter("rough_tex", std.roughness_texture)
+			smat.set_shader_parameter("rough_channel", _channel_vec(std.roughness_texture_channel))
+		smat.set_shader_parameter("base_roughness", std.roughness)
+		smat.set_shader_parameter("has_metal_tex", std.metallic_texture != null)
+		if std.metallic_texture != null:
+			smat.set_shader_parameter("metal_tex", std.metallic_texture)
+			smat.set_shader_parameter("metal_channel", _channel_vec(std.metallic_texture_channel))
+		smat.set_shader_parameter("base_metallic", std.metallic)
+		smat.set_shader_parameter("has_emission_tex", std.emission_enabled and std.emission_texture != null)
+		if std.emission_texture != null:
+			smat.set_shader_parameter("emission_tex", std.emission_texture)
+	return smat

@@ -1,12 +1,12 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
-[ext_resource type="PackedScene" path="res://assets/models/heroes/ghoul/ghoul.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://assets/models/kit/ashen_thrall.glb" id="2"]
 
 [node name="HollowGhoul" type="Node3D"]
 script = ExtResource("1")
 actor_id = "hollow_ghoul"
-height_meters = 1.78
+height_meters = 1.72
 yaw_offset_deg = 180.0
 
 [node name="ModelPivot" type="Node3D" parent="."]

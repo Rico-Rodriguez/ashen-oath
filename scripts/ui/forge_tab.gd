@@ -28,6 +28,15 @@ extends MarginContainer
 @onready var result_meta_lbl: Label = $VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox/ResultMetaLbl
 @onready var result_affix_lbl: Label = $VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox/ResultAffixLbl
 @onready var equip_now_btn: Button = $VBox/ForgeView/ResultPanel/ResultVBox/EquipNowBtn
+@onready var odds_panel: PanelContainer = $VBox/ForgeView/OddsPanel
+@onready var odds_header_lbl: Label = $VBox/ForgeView/OddsPanel/OddsVBox/OddsHeaderLbl
+@onready var odds_rare_panel: PanelContainer = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsRare
+@onready var odds_rare_lbl: Label = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsRare/RareLbl
+@onready var odds_epic_panel: PanelContainer = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsEpic
+@onready var odds_epic_lbl: Label = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsEpic/EpicLbl
+@onready var odds_sov_panel: PanelContainer = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsSov
+@onready var odds_sov_lbl: Label = $VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsSov/SovLbl
+@onready var odds_foot_lbl: Label = $VBox/ForgeView/OddsPanel/OddsVBox/OddsFootLbl
 
 @onready var bestiary_view: VBoxContainer = $VBox/BestiaryView
 @onready var bestiary_header_lbl: Label = $VBox/BestiaryView/BestiaryHeaderLbl
@@ -48,6 +57,18 @@ func _ready() -> void:
 	anvil_banner.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_BRONZE, 1, 5, 12, 8))
 	cost_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 5, 12, 10))
 	result_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_SLATE, 1, 5, 14, 12))
+	odds_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_SLATE, 1, 5, 12, 10))
+	var r_rare := GameEnums.rarity_color(GameEnums.Rarity.RARE)
+	var r_epic := GameEnums.rarity_color(GameEnums.Rarity.EPIC)
+	var r_sov := GameEnums.rarity_color(GameEnums.Rarity.SOVEREIGN)
+	odds_rare_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS.lerp(r_rare, 0.08), r_rare.darkened(0.15), 1, 4, 8, 8))
+	odds_epic_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS.lerp(r_epic, 0.08), r_epic.darkened(0.15), 1, 4, 8, 8))
+	odds_sov_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS.lerp(r_sov, 0.08), r_sov.darkened(0.15), 1, 4, 8, 8))
+	UiThemeBuilder.style_label(odds_header_lbl, UiThemeBuilder.font_title(), 12, UiThemeBuilder.TEXT_GOLD)
+	UiThemeBuilder.style_label(odds_rare_lbl, UiThemeBuilder.font_bold(), 13, r_rare, 1)
+	UiThemeBuilder.style_label(odds_epic_lbl, UiThemeBuilder.font_bold(), 13, r_epic, 1)
+	UiThemeBuilder.style_label(odds_sov_lbl, UiThemeBuilder.font_bold(), 13, r_sov, 1)
+	UiThemeBuilder.style_label(odds_foot_lbl, UiThemeBuilder.font_body(), 13, UiThemeBuilder.TEXT_MUTED, 1)
 
 	UiThemeBuilder.style_label(anvil_title_lbl, UiThemeBuilder.font_title(), 18, UiThemeBuilder.TEXT_GOLD)
 	UiThemeBuilder.style_label(anvil_sub_lbl, UiThemeBuilder.font_body(), 14, UiThemeBuilder.TEXT_MUTED, 1)
@@ -290,7 +311,7 @@ func _refresh_forged_showcase(gs: Node) -> void:
 	result_affix_lbl.text = "\n".join(lines)
 
 	equip_now_btn.visible = true
-	var cid := str(gs.get("selected_class_id")) if gs != null else "oathbreaker"
+	var cid := "oathbreaker"
 	var hdef := GameRegistry.get_class_def(cid)
 	var already_eq := bool(gs.call("is_item_equipped", item.uid)) if gs != null else false
 	var compat := true
@@ -314,10 +335,20 @@ func _rebuild_bestiary() -> void:
 
 	var gs := _game_state()
 	var ordered: Array[EnemyDef] = []
+	var added: Dictionary = {}
+	for zid in ["hollow_ghoul", "crypt_batlord", "stone_gargoyle", "barrow_troll"]:
+		var ed := GameRegistry.get_enemy(zid)
+		if ed != null:
+			ordered.append(ed)
+			added[zid] = true
 	for b in GameRegistry.get_boss_enemies():
-		ordered.append(b)
+		if not added.has(b.enemy_id):
+			ordered.append(b)
+			added[b.enemy_id] = true
 	for e in GameRegistry.get_regular_enemies():
-		ordered.append(e)
+		if not added.has(e.enemy_id):
+			ordered.append(e)
+			added[e.enemy_id] = true
 
 	for edef in ordered:
 		var card := PanelContainer.new()

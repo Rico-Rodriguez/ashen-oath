@@ -94,11 +94,12 @@ static func build_zone(parent: Node3D, zone_def: ZoneDef, seed_val: int = 1337) 
 		if wr_bars != null:
 			var bars := wr_bars.get_ref() as Node3D
 			if bars != null and is_instance_valid(bars):
+				var open_y := 4.35 if bars.name == "PortcullisBars" else -4.4
 				if bars.is_inside_tree() and not headless:
 					var tw := bars.create_tween()
-					tw.tween_property(bars, "position:y", -4.4, 0.65).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
+					tw.tween_property(bars, "position:y", open_y, 0.72).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_IN_OUT)
 				else:
-					bars.position.y = -4.4
+					bars.position.y = open_y
 					bars.visible = false
 		if wr_parent != null:
 			var p_node := wr_parent.get_ref() as Node3D
@@ -303,41 +304,18 @@ static func _make_build_cache(profile: Dictionary, headless: bool) -> Dictionary
 	cache["stone_mat"] = _make_stone_material(profile["stone_albedo"] as Color)
 	cache["iron_mat"] = _make_iron_material(profile["iron_albedo"] as Color)
 
-	var stand_cyl := CylinderMesh.new()
-	stand_cyl.top_radius = 0.12
-	stand_cyl.bottom_radius = 0.28
-	stand_cyl.height = 1.25
-	stand_cyl.radial_segments = 8
-	cache["brazier_stand_mesh"] = stand_cyl
-
-	var bowl_cyl := CylinderMesh.new()
-	bowl_cyl.top_radius = 0.42
-	bowl_cyl.bottom_radius = 0.20
-	bowl_cyl.height = 0.28
-	bowl_cyl.radial_segments = 10
-	cache["brazier_bowl_mesh"] = bowl_cyl
-
-	var coal_sph := SphereMesh.new()
-	coal_sph.radius = 0.28
-	coal_sph.height = 0.22
-	cache["brazier_coal_mesh"] = coal_sph
+	cache["kit_pillar"] = load("res://assets/models/kit/kit_gothic_pillar.glb") as PackedScene
+	cache["kit_arch"] = load("res://assets/models/kit/kit_gothic_arch.glb") as PackedScene
+	cache["kit_brazier"] = load("res://assets/models/kit/kit_wrought_brazier.glb") as PackedScene
+	cache["kit_boss_gate"] = load("res://assets/models/kit/kit_boss_gate.glb") as PackedScene
 
 	var flame_quad := QuadMesh.new()
-	flame_quad.size = Vector2(0.92, 1.38)
+	flame_quad.size = Vector2(0.76, 1.08)
 	cache["brazier_flame_mesh"] = flame_quad
-
-	var pillar_base := BoxMesh.new()
-	pillar_base.size = Vector3(1.15, 0.45, 1.15)
-	cache["pillar_base_mesh"] = pillar_base
 
 	var flame_sh := load("res://shaders/vfx_smokey_flame.gdshader") as Shader
 	for slot_key in ["brazier_primary", "brazier_secondary"]:
 		var bspec: Dictionary = profile[slot_key]
-		var cmat := StandardMaterial3D.new()
-		cmat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-		cmat.albedo_color = bspec["coals"] as Color
-		cache[slot_key + "_coal_mat"] = cmat
-
 		if flame_sh != null:
 			var fmat := ShaderMaterial.new()
 			fmat.shader = flame_sh
@@ -546,63 +524,24 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		return
 
 	var stone_mat := cache["stone_mat"] as Material
-	var iron_mat := cache["iron_mat"] as Material
+	var gate_ps := cache.get("kit_boss_gate") as PackedScene
+	if gate_ps != null:
+		var gate_inst := gate_ps.instantiate() as Node3D
+		gate_inst.name = "KitBossGateModel"
+		gate_inst.scale = Vector3(1.95, 1.38, 1.38)
+		gate_root.add_child(gate_inst)
+		var port_bars := gate_inst.find_child("PortcullisBars", true, false) as Node3D
+		if port_bars != null:
+			gate_refs["bars"] = port_bars
 
-	var pbox := BoxMesh.new()
-	pbox.size = Vector3(1.85, 5.4, 1.85)
-	var cprism := PrismMesh.new()
-	cprism.size = Vector3(2.2, 1.2, 2.2)
-	var wbox := BoxMesh.new()
-	wbox.size = Vector3(8.5, 3.8, 1.4)
-
+	var wing_box := BoxMesh.new()
+	wing_box.size = Vector3(6.2, 5.1, 1.65)
 	for side_s: float in FLANK_SIDES:
-		var pylon := MeshInstance3D.new()
-		pylon.mesh = pbox
-		pylon.position = Vector3(side_s * 6.8, 2.7, 0.0)
-		pylon.material_override = stone_mat
-		gate_root.add_child(pylon)
-
-		var cap := MeshInstance3D.new()
-		cap.mesh = cprism
-		cap.position = Vector3(side_s * 6.8, 6.0, 0.0)
-		cap.material_override = stone_mat
-		gate_root.add_child(cap)
-
 		var wing := MeshInstance3D.new()
-		wing.mesh = wbox
-		wing.position = Vector3(side_s * 11.8, 1.9, 0.0)
+		wing.mesh = wing_box
+		wing.position = Vector3(side_s * 13.4, 2.55, 0.0)
 		wing.material_override = stone_mat
 		gate_root.add_child(wing)
-
-	var lintel := MeshInstance3D.new()
-	var lbox := BoxMesh.new()
-	lbox.size = Vector3(15.4, 0.95, 1.55)
-	lintel.mesh = lbox
-	lintel.position = Vector3(0.0, 4.9, 0.0)
-	lintel.material_override = stone_mat
-	gate_root.add_child(lintel)
-
-	var bar_cyl := CylinderMesh.new()
-	bar_cyl.top_radius = 0.075
-	bar_cyl.bottom_radius = 0.085
-	bar_cyl.height = 4.3
-	bar_cyl.radial_segments = 8
-
-	for i in range(-6, 7):
-		var bar := MeshInstance3D.new()
-		bar.mesh = bar_cyl
-		bar.position = Vector3(float(i) * 0.92, 2.15, 0.0)
-		bar.material_override = iron_mat
-		bars_holder.add_child(bar)
-
-	var rbox := BoxMesh.new()
-	rbox.size = Vector3(12.2, 0.16, 0.24)
-	for cross_y in [1.1, 2.6, 4.0]:
-		var rail := MeshInstance3D.new()
-		rail.mesh = rbox
-		rail.position = Vector3(0.0, float(cross_y), 0.0)
-		rail.material_override = iron_mat
-		bars_holder.add_child(rail)
 
 	var ward_root := Node3D.new()
 	ward_root.name = "RuneWardSeal"
@@ -616,21 +555,21 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		wmat.shader = energy_sh
 		wmat.set_shader_parameter("beam_mode", 1)
 		wmat.set_shader_parameter("energy_color", ward_col)
-		wmat.set_shader_parameter("hdr_gain", 3.6)
+		wmat.set_shader_parameter("hdr_gain", 1.85)
 
 		var seal_mi := MeshInstance3D.new()
 		var seal_q := PlaneMesh.new()
-		seal_q.size = Vector2(3.6, 3.6)
+		seal_q.size = Vector2(3.8, 3.8)
 		seal_mi.mesh = seal_q
 		seal_mi.rotation_degrees.x = 90.0
-		seal_mi.position = Vector3(0.0, 2.35, 0.16)
+		seal_mi.position = Vector3(0.0, 2.65, 0.22)
 		seal_mi.material_override = wmat
 		ward_root.add_child(seal_mi)
 
 	var glight := OmniLight3D.new()
-	glight.position = Vector3(0.0, 2.5, 0.8)
+	glight.position = Vector3(0.0, 2.8, 1.0)
 	glight.light_color = ward_col
-	glight.light_energy = 2.4
+	glight.light_energy = 2.2
 	glight.omni_range = 8.5
 	glight.shadow_enabled = false
 	gate_root.add_child(glight)
@@ -643,36 +582,9 @@ static func _build_shrine_sanctuary(parent: Node3D, profile: Dictionary, cache: 
 	s_root.position = SHRINE_POS
 	parent.add_child(s_root)
 
-	var stone_mat := cache["stone_mat"] as Material
-	var dais := MeshInstance3D.new()
-	var dcyl := CylinderMesh.new()
-	dcyl.top_radius = 3.2
-	dcyl.bottom_radius = 3.6
-	dcyl.height = 0.14
-	dcyl.radial_segments = 16
-	dais.mesh = dcyl
-	dais.position = Vector3(0.0, -0.04, 0.0)
-	dais.material_override = stone_mat
-	s_root.add_child(dais)
-
-	var energy_sh := load("res://shaders/vfx_energy.gdshader") as Shader
-	if energy_sh != null:
-		var rmat := ShaderMaterial.new()
-		rmat.shader = energy_sh
-		rmat.set_shader_parameter("beam_mode", 1)
-		rmat.set_shader_parameter("energy_color", profile["shrine_rune"] as Color)
-		rmat.set_shader_parameter("hdr_gain", 1.65)
-		var rmi := MeshInstance3D.new()
-		var rpm := PlaneMesh.new()
-		rpm.size = Vector2(5.4, 5.4)
-		rmi.mesh = rpm
-		rmi.position = Vector3(0.0, 0.032, 0.0)
-		rmi.material_override = rmat
-		s_root.add_child(rmi)
-
 	for side_s: float in FLANK_SIDES:
-		_spawn_ruin_pillar(s_root, Vector3(side_s * 4.6, 0.0, -1.2), 3.4, cache)
-		_spawn_brazier(s_root, Vector3(side_s * 3.6, 0.0, 1.2), "brazier_primary", profile, cache)
+		_spawn_ruin_pillar(s_root, Vector3(side_s * 5.2, 0.0, -1.2), 5.6, cache)
+		_spawn_brazier(s_root, Vector3(side_s * 3.8, 0.0, 1.4), "brazier_primary", profile, cache)
 
 
 static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache: Dictionary, rng: RandomNumberGenerator) -> void:
@@ -684,7 +596,11 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 
 	for side_s: float in FLANK_SIDES:
 		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, 33.0), "brazier_primary", profile, cache)
-		_spawn_ruin_pillar(props, Vector3(side_s * 6.8, 0.0, 34.2), 3.6, cache)
+		_spawn_ruin_pillar(props, Vector3(side_s * 7.8, 0.0, 34.4), 6.2, cache)
+
+	if zid == "fringe":
+		for az: float in [28.5, 11.5, -3.0, -20.5, -53.8]:
+			_spawn_gothic_arch(props, Vector3(0.0, 0.0, az), Vector3(2.28, 1.38, 1.25), cache)
 
 	var idx := 0
 	for spec in CLEARING_SPECS:
@@ -692,16 +608,16 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 		var r := float(spec["radius"])
 		for side_s: float in FLANK_SIDES:
 			var slot := "brazier_secondary" if (idx + (1 if side_s > 0.0 else 0)) % 2 == 1 else "brazier_primary"
-			_spawn_brazier(props, Vector3(side_s * 5.4, 0.0, c.z + r * 0.88), slot, profile, cache)
-			_spawn_ruin_pillar(props, Vector3(side_s * (r + 1.8), 0.0, c.z - 2.0), rng.randf_range(2.6, 4.4), cache)
-			_spawn_ruin_pillar(props, Vector3(side_s * (r + 2.1), 0.0, c.z + 3.2), rng.randf_range(2.2, 3.8), cache)
+			_spawn_brazier(props, Vector3(side_s * 5.6, 0.0, c.z + r * 0.88), slot, profile, cache)
+			_spawn_ruin_pillar(props, Vector3(side_s * (r + 1.6), 0.0, c.z - 2.2), rng.randf_range(5.2, 6.8), cache)
+			_spawn_ruin_pillar(props, Vector3(side_s * (r + 1.9), 0.0, c.z + 3.4), rng.randf_range(4.6, 6.4), cache)
 		if zid == "catacombs":
 			_spawn_catacomb_arch(props, Vector3(0.0, 0.0, c.z + r * 0.95), 25.5, 6.6, cache)
 		idx += 1
 
 	for side_s: float in FLANK_SIDES:
 		var b_slot := "brazier_secondary" if side_s > 0.0 else "brazier_primary"
-		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, BOSS_GATE_Z + 1.6), "brazier_primary", profile, cache)
+		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, BOSS_GATE_Z + 1.8), "brazier_primary", profile, cache)
 		_spawn_brazier(props, Vector3(side_s * 8.6, 0.0, -38.5), b_slot, profile, cache)
 		_spawn_brazier(props, Vector3(side_s * 10.6, 0.0, -45.5), "brazier_primary", profile, cache)
 		_spawn_brazier(props, Vector3(side_s * 8.4, 0.0, -52.5), b_slot, profile, cache)
@@ -714,24 +630,35 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 		var ang := lerpf(-PI * 0.84, -PI * 0.16, float(i) / 7.0)
 		var px := cos(ang) * (BOSS_RADIUS + 1.8)
 		var pz := BOSS_CENTER.z + sin(ang) * (BOSS_RADIUS + 1.8)
-		if zid == "fringe":
-			_spawn_standing_monolith(props, Vector3(px, 0.0, pz), rng.randf_range(4.2, 6.2), rng.randf_range(-0.14, 0.14), cache)
-		else:
-			_spawn_ruin_pillar(props, Vector3(px, 0.0, pz), rng.randf_range(3.8, 5.8), cache)
+		_spawn_ruin_pillar(props, Vector3(px, 0.0, pz), rng.randf_range(5.4, 7.0), cache)
+
+
+static func _spawn_gothic_arch(parent: Node3D, pos: Vector3, scale_vec: Vector3, cache: Dictionary) -> void:
+	var arch_ps := cache.get("kit_arch") as PackedScene
+	if arch_ps == null:
+		return
+	var arch := arch_ps.instantiate() as Node3D
+	arch.name = "GothicNaveArch"
+	arch.position = pos
+	arch.scale = scale_vec
+	parent.add_child(arch)
 
 
 static func _spawn_ruin_pillar(parent: Node3D, pos: Vector3, height: float, cache: Dictionary) -> void:
+	var pillar_ps := cache.get("kit_pillar") as PackedScene
+	if pillar_ps != null:
+		var holder := pillar_ps.instantiate() as Node3D
+		holder.name = "GothicPillar"
+		holder.position = pos
+		var h_scale := clampf(height / 6.2, 0.72, 1.25)
+		holder.scale = Vector3(1.05, h_scale, 1.05)
+		parent.add_child(holder)
+		return
+
 	var holder := Node3D.new()
 	holder.position = pos
 	parent.add_child(holder)
-
 	var stone_mat := cache["stone_mat"] as Material
-	var base := MeshInstance3D.new()
-	base.mesh = cache["pillar_base_mesh"] as Mesh
-	base.position = Vector3(0.0, 0.225, 0.0)
-	base.material_override = stone_mat
-	holder.add_child(base)
-
 	var shaft := MeshInstance3D.new()
 	var cmesh := CylinderMesh.new()
 	cmesh.top_radius = 0.38
@@ -739,7 +666,7 @@ static func _spawn_ruin_pillar(parent: Node3D, pos: Vector3, height: float, cach
 	cmesh.height = height
 	cmesh.radial_segments = 8
 	shaft.mesh = cmesh
-	shaft.position = Vector3(0.0, 0.45 + height * 0.5, 0.0)
+	shaft.position = Vector3(0.0, height * 0.5, 0.0)
 	shaft.material_override = stone_mat
 	holder.add_child(shaft)
 
@@ -800,31 +727,17 @@ static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profi
 	b_root.position = pos
 	parent.add_child(b_root)
 
-	var iron_mat := cache["iron_mat"] as Material
 	var bspec: Dictionary = profile[slot_key]
-
-	var stand := MeshInstance3D.new()
-	stand.mesh = cache["brazier_stand_mesh"] as Mesh
-	stand.position = Vector3(0.0, 0.625, 0.0)
-	stand.material_override = iron_mat
-	b_root.add_child(stand)
-
-	var bowl := MeshInstance3D.new()
-	bowl.mesh = cache["brazier_bowl_mesh"] as Mesh
-	bowl.position = Vector3(0.0, 1.32, 0.0)
-	bowl.material_override = iron_mat
-	b_root.add_child(bowl)
-
-	var coals := MeshInstance3D.new()
-	coals.mesh = cache["brazier_coal_mesh"] as Mesh
-	coals.position = Vector3(0.0, 1.42, 0.0)
-	coals.material_override = cache[slot_key + "_coal_mat"] as Material
-	b_root.add_child(coals)
+	var brazier_ps := cache.get("kit_brazier") as PackedScene
+	if brazier_ps != null:
+		var inst := brazier_ps.instantiate() as Node3D
+		inst.scale = Vector3.ONE * 1.15
+		b_root.add_child(inst)
 
 	if cache.has(slot_key + "_flame_mat"):
 		var fmi := MeshInstance3D.new()
 		fmi.mesh = cache["brazier_flame_mesh"] as Mesh
-		fmi.position = Vector3(0.0, 1.96, 0.0)
+		fmi.position = Vector3(0.0, 1.94, 0.0)
 		fmi.material_override = cache[slot_key + "_flame_mat"] as Material
 		fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		b_root.add_child(fmi)
@@ -832,8 +745,8 @@ static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profi
 	var light := OmniLight3D.new()
 	light.position = Vector3(0.0, 2.08, 0.0)
 	light.light_color = bspec["light"] as Color
-	light.light_energy = 2.15
-	light.omni_range = 9.0
+	light.light_energy = 2.25
+	light.omni_range = 9.5
 	light.shadow_enabled = false
 	b_root.add_child(light)
 
@@ -863,31 +776,24 @@ static func _populate_fringe_biome(biome_root: Node3D, cache: Dictionary, rng: R
 
 	var z_cursor := 43.0
 	while z_cursor >= -62.0:
-		var min_edge := 15.0 if z_cursor >= BOSS_GATE_Z else 16.5
+		var min_edge := 15.8 if z_cursor >= BOSS_GATE_Z else 17.0
 		for side_s: float in FLANK_SIDES:
-			if not trees.is_empty():
-				var t_inst := trees[rng.randi_range(0, trees.size() - 1)].instantiate() as Node3D
-				t_inst.position = Vector3(side_s * (min_edge + rng.randf_range(0.6, 5.6)), 0.0, z_cursor + rng.randf_range(-1.4, 1.4))
+			if not trees.is_empty() and rng.randf() < 0.65:
+				var t_inst := trees[0].instantiate() as Node3D
+				t_inst.position = Vector3(side_s * (min_edge + rng.randf_range(3.2, 8.8)), 0.0, z_cursor + rng.randf_range(-1.6, 1.6))
 				t_inst.rotation.y = rng.randf_range(0.0, TAU)
-				t_inst.scale = Vector3.ONE * rng.randf_range(1.45, 2.35)
+				t_inst.scale = Vector3.ONE * rng.randf_range(1.65, 2.55)
 				_style_prop(t_inst, "fringe_tree", wood_tint, Color.BLACK, 0.0, cache)
 				biome_root.add_child(t_inst)
 
-				var t_back := trees[0].instantiate() as Node3D
-				t_back.position = Vector3(side_s * (min_edge + rng.randf_range(6.2, 12.5)), 0.0, z_cursor + rng.randf_range(-2.0, 2.0))
-				t_back.rotation.y = rng.randf_range(0.0, TAU)
-				t_back.scale = Vector3.ONE * rng.randf_range(1.85, 2.85)
-				_style_prop(t_back, "fringe_tree", wood_tint, Color.BLACK, 0.0, cache)
-				biome_root.add_child(t_back)
-
-			if not rocks.is_empty() and rng.randf() < 0.72:
+			if not rocks.is_empty() and rng.randf() < 0.78:
 				var r_inst := rocks[rng.randi_range(0, rocks.size() - 1)].instantiate() as Node3D
-				r_inst.position = Vector3(side_s * (min_edge + rng.randf_range(-0.5, 2.5)), -0.08, z_cursor + rng.randf_range(-1.8, 1.8))
+				r_inst.position = Vector3(side_s * (min_edge + rng.randf_range(-0.6, 2.4)), -0.08, z_cursor + rng.randf_range(-1.8, 1.8))
 				r_inst.rotation.y = rng.randf_range(0.0, TAU)
-				r_inst.scale = Vector3(rng.randf_range(1.2, 2.0), rng.randf_range(1.0, 1.8), rng.randf_range(1.2, 2.0))
+				r_inst.scale = Vector3(rng.randf_range(1.3, 2.2), rng.randf_range(1.1, 2.0), rng.randf_range(1.3, 2.2))
 				_style_prop(r_inst, "fringe_rock", rock_tint, Color.BLACK, 0.0, cache)
 				biome_root.add_child(r_inst)
-		z_cursor -= 4.4
+		z_cursor -= 4.8
 
 	for i in range(9):
 		var ang := lerpf(-PI * 0.88, -PI * 0.12, float(i) / 8.0)

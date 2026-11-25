@@ -34,61 +34,90 @@ void vertex() {
 
 void fragment() {
 	vec2 w = v_world_xz;
-	float n_macro = vnoise(w * 0.12) * 0.65 + vnoise(w * 0.37 + 11.3) * 0.35;
-	float n_detail = vnoise(w * 1.15 + 4.7);
+	float n_macro = vnoise(w * 0.14) * 0.65 + vnoise(w * 0.42 + 11.3) * 0.35;
+	float n_detail = vnoise(w * 1.45 + 4.7);
 
-	float road_wobble = sin(w.y * 0.09) * 0.65 + (n_macro - 0.5) * 1.2;
-	float road_d = abs(w.x - road_wobble);
-	float road_mask = 1.0 - smoothstep(2.4, 5.4, road_d + (n_detail - 0.5) * 0.9);
+	vec2 flag_size = vec2(1.48, 0.96);
+	float row_idx = floor(w.y / flag_size.y);
+	vec2 f_uv = vec2((w.x + mod(row_idx, 2.0) * 0.5 * flag_size.x) / flag_size.x, w.y / flag_size.y);
+	vec2 tile_id = floor(f_uv);
+	vec2 cell = fract(f_uv);
+	float th = hash12(tile_id);
+	float th2 = hash12(tile_id + vec2(17.3, 9.1));
 
-	float c0 = 1.0 - smoothstep(7.2, 10.8, length(w - vec2(0.0, 22.0)) + (n_macro - 0.5) * 1.4);
-	float c1 = 1.0 - smoothstep(8.2, 11.8, length(w - vec2(0.0, 2.0)) + (n_macro - 0.5) * 1.4);
-	float c2 = 1.0 - smoothstep(8.6, 12.2, length(w - vec2(0.0, -19.0)) + (n_macro - 0.5) * 1.4);
-	float shrine_c = 1.0 - smoothstep(3.2, 5.2, length(w - vec2(0.0, -8.5)));
-	float boss_c = 1.0 - smoothstep(10.5, 14.5, length(w - vec2(0.0, -45.0)) + (n_macro - 0.5) * 1.2);
+	float aspect = flag_size.x / flag_size.y;
+	float d_left = cell.x * aspect;
+	float d_right = (1.0 - cell.x) * aspect;
+	float d_bot = cell.y;
+	float d_top = 1.0 - cell.y;
+	float edge_dist = min(min(d_left, d_right), min(d_bot, d_top));
 
-	float clearing_mask = max(max(c0, c1), max(c2, max(shrine_c, boss_c)));
+	float chip = (vnoise(w * 4.6 + th * 13.7) - 0.5) * 0.024;
+	float mortar = 1.0 - smoothstep(0.022, 0.056, edge_dist + chip);
+	float bevel = smoothstep(0.024, 0.058, edge_dist) * (1.0 - smoothstep(0.058, 0.14, edge_dist));
 
-	float ring0 = exp(-pow((length(w - vec2(0.0, 22.0)) - 8.6) / 1.1, 2.0));
-	float ring1 = exp(-pow((length(w - vec2(0.0, 2.0)) - 9.6) / 1.1, 2.0));
-	float ring2 = exp(-pow((length(w - vec2(0.0, -19.0)) - 10.2) / 1.1, 2.0));
-	float ring_boss = exp(-pow((length(w - vec2(0.0, -45.0)) - 12.2) / 1.4, 2.0));
-	float stone_weight = clamp(road_mask * 0.78 + max(max(ring0, ring1), max(ring2, ring_boss)) * 0.85 + boss_c * 0.52 + shrine_c * 0.85, 0.0, 1.0);
-	stone_weight *= smoothstep(0.28, 0.68, n_detail * 0.55 + stone_weight * 0.65);
+	float crack_field = abs(vnoise(w * 2.25 + vec2(th * 9.7, th2 * 5.3)) - 0.5);
+	float crack_gate = step(0.42, th);
+	float crack = (1.0 - smoothstep(0.010, 0.032, crack_field)) * crack_gate * (1.0 - mortar);
 
-	float dirt_weight = clamp(max(clearing_mask * 0.88, road_mask * 0.95) - stone_weight * 0.65, 0.0, 1.0);
-	float forest_weight = clamp(1.0 - max(stone_weight, dirt_weight), 0.0, 1.0);
-	float w_sum = max(stone_weight + dirt_weight + forest_weight, 0.001);
-	stone_weight /= w_sum;
-	dirt_weight /= w_sum;
-	forest_weight /= w_sum;
+	float center_nave = 1.0 - smoothstep(5.8, 11.2, abs(w.x) + (n_detail - 0.5) * 0.9);
+	float boss_court = 1.0 - smoothstep(11.5, 16.0, length(w - vec2(0.0, -45.0)) + (n_macro - 0.5) * 1.1);
+	float shrine_court = 1.0 - smoothstep(3.6, 6.2, length(w - vec2(0.0, -8.5)));
+	float nave_border = exp(-pow((abs(w.x) - 5.6) / 0.42, 2.0)) * step(-31.0, w.y);
+	float stone_weight = clamp(max(center_nave, max(boss_court, shrine_court)) * 0.92 + 0.35, 0.0, 1.0);
 
-	vec2 uv_f = w * 0.22;
-	vec2 uv_d = w * 0.26;
-	vec2 uv_s = w * 0.30;
+	float flank_earth = smoothstep(9.5, 16.5, abs(w.x) + (n_macro - 0.5) * 1.6) * (1.0 - boss_court);
+	float moss_weight = clamp(flank_earth * 0.65 * (0.45 + 0.55 * n_detail), 0.0, 0.72);
+	float flag_mask = clamp(1.0 - moss_weight * 0.75, 0.25, 1.0);
 
-	vec3 f_col = texture(forest_albedo, uv_f).rgb * vec3(0.38, 0.41, 0.36);
-	vec3 d_col = texture(dirt_albedo, uv_d).rgb * vec3(0.44, 0.40, 0.37);
-	vec3 s_col = texture(stone_albedo, uv_s).rgb * vec3(0.46, 0.47, 0.52);
+	vec2 uv_s = w * 0.26;
+	vec2 uv_f = w * 0.24;
+	vec2 uv_d = w * 0.28;
 
-	vec3 alb = f_col * forest_weight + d_col * dirt_weight + s_col * stone_weight;
-	vec3 tint_norm = clamp(ground_tint * 2.6, vec3(0.55), vec3(1.18));
-	alb *= tint_norm * mix(0.80, 1.10, n_macro);
+	vec3 s_tex = texture(stone_albedo, uv_s).rgb;
+	vec3 f_tex = texture(forest_albedo, uv_f).rgb;
+	vec3 d_tex = texture(dirt_albedo, uv_d).rgb;
 
-	float flank_dark = smoothstep(10.5, 19.0, abs(w.x));
-	alb *= mix(1.0, 0.42, flank_dark);
+	vec3 slab_tint = mix(vec3(0.24, 0.25, 0.28), vec3(0.36, 0.37, 0.41), th);
+	slab_tint += vec3(0.025, 0.018, 0.010) * (th2 - 0.5);
+	vec3 stone_col = s_tex * slab_tint * 1.45;
+	stone_col *= mix(1.0, 1.16, bevel * (1.0 - crack));
+	stone_col *= mix(1.0, 1.18, nave_border * 0.65);
 
-	vec3 raw_n =
-		(texture(forest_normal, uv_f).rgb * 2.0 - 1.0) * forest_weight +
-		(texture(dirt_normal, uv_d).rgb * 2.0 - 1.0) * dirt_weight +
-		(texture(stone_normal, uv_s).rgb * 2.0 - 1.0) * stone_weight;
-	raw_n.xy *= 0.55;
-	raw_n.z = max(raw_n.z, 0.45);
+	vec3 mortar_col = vec3(0.055, 0.058, 0.065) * mix(0.85, 1.15, n_detail);
+	stone_col = mix(stone_col, mortar_col, clamp(mortar * 0.90 + crack * 0.72, 0.0, 1.0));
+
+	vec3 outer_col = mix(d_tex * vec3(0.22, 0.21, 0.20), f_tex * vec3(0.18, 0.21, 0.19), n_detail);
+	vec3 alb = mix(stone_col, outer_col, moss_weight);
+
+	vec3 tint_norm = clamp(ground_tint * 2.45, vec3(0.58), vec3(1.22));
+	alb *= tint_norm * mix(0.82, 1.10, n_macro);
+
+	float flank_dark = smoothstep(11.5, 21.0, abs(w.x));
+	alb *= mix(1.0, 0.38, flank_dark);
+
+	vec2 bevel_grad = vec2(0.0);
+	float bevel_str = bevel * 0.42 * flag_mask;
+	if (d_left < 0.14) bevel_grad.x -= bevel_str;
+	if (d_right < 0.14) bevel_grad.x += bevel_str;
+	if (d_bot < 0.14) bevel_grad.y -= bevel_str;
+	if (d_top < 0.14) bevel_grad.y += bevel_str;
+
+	vec3 s_nrm = texture(stone_normal, uv_s).rgb * 2.0 - 1.0;
+	vec3 f_nrm = texture(forest_normal, uv_f).rgb * 2.0 - 1.0;
+	vec3 raw_n = mix(s_nrm, f_nrm, moss_weight);
+	raw_n.xy = raw_n.xy * 0.52 + bevel_grad;
+	raw_n.z = max(raw_n.z, 0.50);
 	vec3 nrm = normalize(raw_n);
+
+	float moisture = smoothstep(0.56, 0.78, vnoise(w * 0.22 + vec2(3.7, 8.2))) * (1.0 - mortar) * flag_mask;
+	float base_rgh = mix(0.82, 0.96, clamp(mortar + moss_weight * 0.5, 0.0, 1.0));
+	float final_rgh = mix(base_rgh, 0.34, moisture * 0.75);
+	alb = mix(alb, alb * 0.74, moisture * 0.42);
 
 	ALBEDO = alb;
 	NORMAL_MAP = nrm * 0.5 + 0.5;
-	NORMAL_MAP_DEPTH = 0.65;
-	ROUGHNESS = mix(0.94, 0.76, stone_weight);
-	METALLIC = 0.04 * stone_weight;
+	NORMAL_MAP_DEPTH = 0.72;
+	ROUGHNESS = final_rgh;
+	METALLIC = 0.06 * stone_weight * (1.0 - mortar);
 }

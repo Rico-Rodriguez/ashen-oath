@@ -25,11 +25,12 @@ func _bake_icon() -> void:
 	env.background_mode = Environment.BG_CLEAR_COLOR
 	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
 	env.ambient_light_color = Color(0.22, 0.24, 0.32)
-	env.ambient_light_energy = 0.95
+	env.ambient_light_energy = 0.56
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
 	env.glow_enabled = true
-	env.glow_intensity = 0.38
-	env.glow_bloom = 0.08
+	env.glow_intensity = 0.20
+	env.glow_bloom = 0.03
+	env.glow_hdr_threshold = 1.25
 
 	var we := WorldEnvironment.new()
 	we.environment = env
@@ -37,35 +38,35 @@ func _bake_icon() -> void:
 
 	var key_light := DirectionalLight3D.new()
 	key_light.light_color = Color(1.0, 0.88, 0.72)
-	key_light.light_energy = 2.45
+	key_light.light_energy = 1.15
 	key_light.shadow_enabled = true
-	key_light.look_at_from_position(Vector3(-2.4, 3.6, -3.2), Vector3(0.0, 1.55, 0.0), Vector3.UP)
+	key_light.look_at_from_position(Vector3(-2.6, 2.3, -3.0), Vector3(0.0, 1.55, 0.0), Vector3.UP)
 	vp.add_child(key_light)
 
 	var cool_rim := DirectionalLight3D.new()
 	cool_rim.light_color = Color(0.46, 0.62, 0.94)
-	cool_rim.light_energy = 1.45
+	cool_rim.light_energy = 0.72
 	cool_rim.shadow_enabled = false
-	cool_rim.look_at_from_position(Vector3(2.8, 2.8, 2.6), Vector3(0.0, 1.55, 0.0), Vector3.UP)
+	cool_rim.look_at_from_position(Vector3(2.8, 2.4, 2.6), Vector3(0.0, 1.55, 0.0), Vector3.UP)
 	vp.add_child(cool_rim)
 
 	var ember_rim := OmniLight3D.new()
 	ember_rim.light_color = Color(1.0, 0.50, 0.14)
-	ember_rim.light_energy = 2.65
+	ember_rim.light_energy = 1.65
 	ember_rim.omni_range = 6.5
 	ember_rim.position = Vector3(-1.55, 1.48, 1.25)
 	vp.add_child(ember_rim)
 
 	var ember_under := OmniLight3D.new()
 	ember_under.light_color = Color(0.98, 0.42, 0.12)
-	ember_under.light_energy = 1.85
+	ember_under.light_energy = 1.25
 	ember_under.omni_range = 4.5
 	ember_under.position = Vector3(1.05, 1.30, -1.15)
 	vp.add_child(ember_under)
 
 	var cam := Camera3D.new()
 	cam.current = true
-	cam.fov = 26.5
+	cam.fov = 27.5
 	vp.add_child(cam)
 
 	var ps := load("res://scenes/actors/heroes/oathbreaker.tscn") as PackedScene
@@ -88,9 +89,21 @@ func _bake_icon() -> void:
 	)
 	actor.play_anim("idle", 1.0, true)
 	if actor.anim_player != null:
-		actor.anim_player.advance(0.05)
+		actor.anim_player.play(actor.anim_player.current_animation, 0.0)
+		actor.anim_player.advance(0.15)
 
-	cam.look_at_from_position(Vector3(-0.46, 1.72, -1.94), Vector3(0.01, 1.67, 0.0), Vector3.UP)
+	var focus := Vector3(0.0, 1.54, 0.0)
+	if actor.skeleton != null:
+		var c_idx := actor.skeleton.find_bone("chest")
+		var h_idx := actor.skeleton.find_bone("head")
+		if c_idx >= 0 and h_idx >= 0:
+			var cp := actor.skeleton.global_transform * actor.skeleton.get_bone_global_pose(c_idx).origin
+			var hp := actor.skeleton.global_transform * actor.skeleton.get_bone_global_pose(h_idx).origin
+			focus = cp.lerp(hp, 0.70)
+
+	ember_rim.position = focus + Vector3(-1.40, 0.10, 1.10)
+	ember_under.position = focus + Vector3(1.05, -0.20, -1.15)
+	cam.look_at_from_position(focus + Vector3(-0.40, 0.12, -2.02), focus + Vector3(0.0, 0.10, 0.0), Vector3.UP)
 
 	for _i in range(8):
 		await RenderingServer.frame_post_draw

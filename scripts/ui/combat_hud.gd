@@ -7,6 +7,7 @@ signal hunt_again_requested()
 @onready var root_ctrl: Control = $Root
 @onready var floaters_layer: Control = $Root/FloatersLayer
 
+@onready var top_margin: MarginContainer = $Root/TopMargin
 @onready var top_bar_panel: PanelContainer = $Root/TopMargin/TopVBox/TopBarPanel
 @onready var portrait_frame: PanelContainer = $Root/TopMargin/TopVBox/TopBarPanel/TopRow/PortraitFrame
 @onready var hero_portrait_tex: TextureRect = $Root/TopMargin/TopVBox/TopBarPanel/TopRow/PortraitFrame/HeroPortraitTex
@@ -34,7 +35,7 @@ signal hunt_again_requested()
 
 @onready var thumbstick: VirtualThumbstick = $Root/ThumbstickZone
 @onready var action_deck_margin: MarginContainer = $Root/ActionDeckMargin
-@onready var action_row: HBoxContainer = $Root/ActionDeckMargin/ActionRow
+@onready var action_cluster: Control = $Root/ActionDeckMargin/ActionCluster
 
 @onready var shrine_modal: ColorRect = $Root/ShrineModal
 @onready var shrine_card_panel: PanelContainer = $Root/ShrineModal/Center/ShrinePanel
@@ -64,6 +65,10 @@ signal hunt_again_requested()
 @onready var summary_again_btn: Button = $Root/SummaryModal/Center/SummaryPanel/VBox/SummaryBtns/HuntAgainBtn
 
 var director: CombatDirector = null
+var skill1_btn: Button = null
+var skill2_btn: Button = null
+var skill3_btn: Button = null
+var dash_btn: Button = null
 var _action_btns: Dictionary = {}
 var _floaters: Array[Dictionary] = []
 var _syncing_pause_settings: bool = false
@@ -76,7 +81,8 @@ func _ready() -> void:
 
 	_style_static_chrome()
 	_build_action_buttons()
-	_apply_handedness()
+	root_ctrl.resized.connect(_apply_safe_margins)
+	_apply_safe_margins()
 
 	thumbstick.move_vector_changed.connect(_on_thumbstick_moved)
 	pause_btn.pressed.connect(open_pause_modal)
@@ -111,6 +117,9 @@ func bind_director(p_director: CombatDirector) -> void:
 	director = p_director
 	if director == null:
 		return
+
+	_build_action_buttons()
+	_apply_handedness()
 
 	if not director.hud_updated.is_connected(_on_hud_updated):
 		director.hud_updated.connect(_on_hud_updated)
@@ -203,83 +212,224 @@ func _style_static_chrome() -> void:
 
 
 func _build_action_buttons() -> void:
-	for ch in action_row.get_children():
+	for ch in action_cluster.get_children():
 		ch.queue_free()
 	_action_btns.clear()
+	skill1_btn = null
+	skill2_btn = null
+	skill3_btn = null
+	dash_btn = null
 
-	var specs := [
-		{"id": "skill_1", "key": "[Q]", "default_name": "Skill 1"},
-		{"id": "skill_2", "key": "[E]", "default_name": "Skill 2"},
-		{"id": "dash", "key": "[SPACE]", "default_name": "Dash"},
+	var hdef := director.class_def if director != null else GameRegistry.get_class_def("oathbreaker")
+	var has_s3 := hdef != null and hdef.skill_3 != null
+	var is_mobile := OS.get_name() in ["iOS", "Android"]
+
+	var specs: Array[Dictionary] = [
+		{
+			"id": "skill_1",
+			"node_name": "skill1_btn",
+			"key": "Q",
+			"ab": hdef.skill_1 if hdef != null else null,
+			"short": _short_skill_label(hdef.skill_1 if hdef != null else null, "TEMPEST"),
+			"size": 78,
+			"center": Vector2(86.0, 202.0) if has_s3 else Vector2(96.0, 198.0),
+		},
+		{
+			"id": "skill_2",
+			"node_name": "skill2_btn",
+			"key": "E",
+			"ab": hdef.skill_2 if hdef != null else null,
+			"short": _short_skill_label(hdef.skill_2 if hdef != null else null, "PYRE"),
+			"size": 78,
+			"center": Vector2(128.0, 100.0) if has_s3 else Vector2(180.0, 86.0),
+		},
 	]
+	if has_s3:
+		specs.append({
+			"id": "skill_3",
+			"node_name": "skill3_btn",
+			"key": "R",
+			"ab": hdef.skill_3,
+			"short": _short_skill_label(hdef.skill_3, "STORM"),
+			"size": 78,
+			"center": Vector2(230.0, 58.0),
+		})
+	specs.append({
+		"id": "dash",
+		"node_name": "dash_btn",
+		"key": "SPC",
+		"ab": hdef.dash_ability if hdef != null else null,
+		"short": "DASH",
+		"size": 86,
+		"center": Vector2(224.0, 196.0),
+	})
+
 	for sp in specs:
 		var aid := str(sp["id"])
+		var btn_sz := int(sp["size"])
+		var ab: AbilityDef = sp["ab"]
+		var ab_id := ab.ability_id if ab != null else ("iron_roll" if aid == "dash" else "iron_tempest")
+		var b_radius := 44
+
+		var slot := Control.new()
+		slot.size = Vector2(float(btn_sz) + 20.0, float(btn_sz) + 24.0)
+		slot.mouse_filter = Control.MOUSE_FILTER_PASS
+		action_cluster.add_child(slot)
+
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(98, 104)
-		btn.clip_contents = true
-		var sb_n := UiThemeBuilder.make_box(Color(0.08, 0.09, 0.12, 0.94), UiThemeBuilder.BORDER_GOLD, 2, 6, 4, 4)
-		var sb_h := UiThemeBuilder.make_box(Color(0.14, 0.15, 0.20, 0.96), UiThemeBuilder.BORDER_GOLD.lightened(0.2), 2, 6, 4, 4)
-		var sb_p := UiThemeBuilder.make_box(UiThemeBuilder.CTA_CRIMSON, UiThemeBuilder.BORDER_GOLD, 2, 6, 4, 4)
+		btn.name = str(sp["node_name"])
+		btn.custom_minimum_size = Vector2(btn_sz, btn_sz)
+		btn.size = Vector2(btn_sz, btn_sz)
+		btn.position = Vector2(10.0, 0.0)
+		btn.pivot_offset = Vector2(float(btn_sz) * 0.5, float(btn_sz) * 0.5)
+
+		var border_w := 3 if aid == "dash" else 2
+		var sb_n := UiThemeBuilder.make_box(Color(0.055, 0.062, 0.082, 0.94), UiThemeBuilder.BORDER_GOLD, border_w, b_radius, 0, 0)
+		sb_n.shadow_color = Color(0.0, 0.0, 0.0, 0.65)
+		sb_n.shadow_size = 5
+		var sb_h := UiThemeBuilder.make_box(Color(0.11, 0.12, 0.16, 0.96), UiThemeBuilder.BORDER_GOLD.lightened(0.22), border_w, b_radius, 0, 0)
+		sb_h.shadow_color = Color(0.85, 0.65, 0.25, 0.30)
+		sb_h.shadow_size = 6
+		var sb_p := UiThemeBuilder.make_box(Color(0.24, 0.09, 0.08, 0.98), UiThemeBuilder.BORDER_GOLD, border_w, b_radius, 0, 0)
 		btn.add_theme_stylebox_override("normal", sb_n)
 		btn.add_theme_stylebox_override("hover", sb_h)
 		btn.add_theme_stylebox_override("focus", sb_h)
 		btn.add_theme_stylebox_override("pressed", sb_p)
 		btn.pressed.connect(_on_action_btn_pressed.bind(aid))
+		btn.button_down.connect(_on_action_btn_down.bind(btn))
+		btn.button_up.connect(_on_action_btn_up.bind(btn))
+		btn.mouse_exited.connect(_on_action_btn_up.bind(btn))
+		slot.add_child(btn)
 
-		var sweep := ColorRect.new()
-		sweep.color = Color(0.02, 0.02, 0.03, 0.76)
-		sweep.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		sweep.anchor_left = 0.0
-		sweep.anchor_right = 1.0
-		sweep.anchor_bottom = 1.0
-		sweep.anchor_top = 1.0
-		btn.add_child(sweep)
+		var icon_tex := TextureRect.new()
+		icon_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		icon_tex.offset_left = 3.0
+		icon_tex.offset_top = 3.0
+		icon_tex.offset_right = -3.0
+		icon_tex.offset_bottom = -3.0
+		icon_tex.texture = UiThemeBuilder.get_skill_icon(ab_id)
+		icon_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+		icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
+		icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(icon_tex)
 
-		var margin := MarginContainer.new()
-		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		margin.add_theme_constant_override("margin_left", 5)
-		margin.add_theme_constant_override("margin_right", 5)
-		margin.add_theme_constant_override("margin_top", 5)
-		margin.add_theme_constant_override("margin_bottom", 5)
-		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		btn.add_child(margin)
-
-		var vb := VBoxContainer.new()
-		vb.alignment = BoxContainer.ALIGNMENT_CENTER
-		vb.add_theme_constant_override("separation", 4)
-		vb.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		margin.add_child(vb)
-
-		var klbl := Label.new()
-		klbl.text = str(sp["key"])
-		klbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		UiThemeBuilder.style_label(klbl, UiThemeBuilder.font_title(), 11, UiThemeBuilder.TEXT_GOLD, 1)
-		klbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vb.add_child(klbl)
-
-		var nlbl := Label.new()
-		nlbl.text = str(sp["default_name"])
-		nlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		nlbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		nlbl.max_lines_visible = 2
-		UiThemeBuilder.style_label(nlbl, UiThemeBuilder.font_bold(), 13, UiThemeBuilder.TEXT_PARCHMENT, 2)
-		nlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vb.add_child(nlbl)
+		var dial := Control.new()
+		dial.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		dial.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		dial.visible = false
+		dial.set_meta("ratio", 0.0)
+		dial.draw.connect(_draw_cd_dial.bind(dial))
+		btn.add_child(dial)
 
 		var cdlbl := Label.new()
-		cdlbl.text = "READY"
+		cdlbl.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 		cdlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
-		UiThemeBuilder.style_label(cdlbl, UiThemeBuilder.font_title(), 11, UiThemeBuilder.TEXT_READY, 2)
+		cdlbl.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+		UiThemeBuilder.style_label(cdlbl, UiThemeBuilder.font_bold(), 20, Color.WHITE, 3)
 		cdlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-		vb.add_child(cdlbl)
+		cdlbl.visible = false
+		btn.add_child(cdlbl)
 
-		action_row.add_child(btn)
+		if not is_mobile:
+			var kbadge := PanelContainer.new()
+			kbadge.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			kbadge.position = Vector2(float(btn_sz) - 20.0, -4.0)
+			kbadge.custom_minimum_size = Vector2(22.0, 18.0)
+			kbadge.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(Color(0.05, 0.055, 0.075, 0.92), UiThemeBuilder.BORDER_BRONZE, 1, 6, 3, 1))
+			var klbl := Label.new()
+			klbl.text = str(sp["key"])
+			klbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+			UiThemeBuilder.style_label(klbl, UiThemeBuilder.font_title(), 9, UiThemeBuilder.TEXT_GOLD, 1)
+			klbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+			kbadge.add_child(klbl)
+			slot.add_child(kbadge)
+
+		var nlbl := Label.new()
+		nlbl.text = str(sp["short"])
+		nlbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		nlbl.position = Vector2(0.0, float(btn_sz) + 2.0)
+		nlbl.size = Vector2(float(btn_sz) + 20.0, 20.0)
+		UiThemeBuilder.style_label(nlbl, UiThemeBuilder.font_title(), 11, UiThemeBuilder.TEXT_PARCHMENT, 2)
+		nlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		slot.add_child(nlbl)
+
+		match aid:
+			"skill_1":
+				skill1_btn = btn
+			"skill_2":
+				skill2_btn = btn
+			"skill_3":
+				skill3_btn = btn
+			"dash":
+				dash_btn = btn
+
 		_action_btns[aid] = {
+			"slot": slot,
 			"btn": btn,
-			"sweep": sweep,
+			"icon": icon_tex,
+			"dial": dial,
 			"name_lbl": nlbl,
 			"cd_lbl": cdlbl,
+			"center": sp["center"],
+			"btn_size": float(btn_sz),
 		}
+
+
+static func _short_skill_label(ab: AbilityDef, fallback: String) -> String:
+	if ab == null:
+		return fallback
+	match ab.ability_id:
+		"iron_tempest":
+			return "TEMPEST"
+		"blackflame_pyre":
+			return "PYRE"
+		"stormbrand_arc":
+			return "STORM"
+		"iron_roll":
+			return "DASH"
+		_:
+			return ab.display_name.get_slice(" ", 0).to_upper()
+
+
+func _draw_cd_dial(dial: Control) -> void:
+	var ratio := clampf(float(dial.get_meta("ratio", 0.0)), 0.0, 1.0)
+	if ratio <= 0.001:
+		return
+	var r := minf(dial.size.x, dial.size.y) * 0.5 - 2.0
+	var c := dial.size * 0.5
+	dial.draw_circle(c, r, Color(0.02, 0.022, 0.032, 0.72))
+	var start_a := -PI * 0.5
+	var end_a := start_a + TAU * ratio
+	var pts := PackedVector2Array([c])
+	var segs := 28
+	for i in range(segs + 1):
+		var a := lerpf(start_a, end_a, float(i) / float(segs))
+		pts.append(c + Vector2(cos(a), sin(a)) * r)
+	dial.draw_colored_polygon(pts, Color(0.015, 0.018, 0.025, 0.35))
+	dial.draw_arc(c, r - 1.5, start_a, end_a, 32, Color(0.88, 0.70, 0.34, 0.85), 2.5, true)
+
+
+func _on_action_btn_down(btn: Button) -> void:
+	if btn != null and is_instance_valid(btn):
+		btn.scale = Vector2(0.90, 0.90)
+
+
+func _on_action_btn_up(btn: Button) -> void:
+	if btn != null and is_instance_valid(btn):
+		if btn.is_inside_tree():
+			var tw := btn.create_tween()
+			tw.tween_property(btn, "scale", Vector2.ONE, 0.09).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		else:
+			btn.scale = Vector2.ONE
+
+
+func _apply_safe_margins() -> void:
+	var m := UiThemeBuilder.get_safe_margins(root_ctrl)
+	top_margin.add_theme_constant_override("margin_top", 10 + int(m["top"]))
+	top_margin.add_theme_constant_override("margin_left", 10 + int(m["left"]))
+	top_margin.add_theme_constant_override("margin_right", 10 + int(m["right"]))
+	thumbstick.safe_bottom = float(m["bottom"])
+	_apply_handedness()
 
 
 func _apply_handedness() -> void:
@@ -288,24 +438,46 @@ func _apply_handedness() -> void:
 	if gs != null and "settings" in gs and gs.settings is Dictionary:
 		left_handed = bool((gs.settings as Dictionary).get("left_handed", false))
 
+	var m := UiThemeBuilder.get_safe_margins(root_ctrl)
+	var bot_pad := 18.0 + float(m["bottom"])
+	var side_pad := 14.0 + float(m["left"] if left_handed else m["right"])
+	var cluster_w := 292.0
+	var cluster_h := 276.0
+
 	if left_handed:
 		action_deck_margin.anchor_left = 0.0
 		action_deck_margin.anchor_right = 0.0
-		action_deck_margin.offset_left = 14.0
-		action_deck_margin.offset_right = 338.0
-		thumbstick.anchor_left = 1.0
+		action_deck_margin.offset_left = side_pad
+		action_deck_margin.offset_right = side_pad + cluster_w
+		thumbstick.anchor_left = 0.42
 		thumbstick.anchor_right = 1.0
-		thumbstick.offset_left = -370.0
-		thumbstick.offset_right = 0.0
+		thumbstick.offset_left = 0.0
+		thumbstick.offset_right = -float(m["right"])
+		thumbstick.is_right_side = true
 	else:
 		action_deck_margin.anchor_left = 1.0
 		action_deck_margin.anchor_right = 1.0
-		action_deck_margin.offset_left = -338.0
-		action_deck_margin.offset_right = -14.0
+		action_deck_margin.offset_left = -(side_pad + cluster_w)
+		action_deck_margin.offset_right = -side_pad
 		thumbstick.anchor_left = 0.0
-		thumbstick.anchor_right = 0.0
-		thumbstick.offset_left = 0.0
-		thumbstick.offset_right = 370.0
+		thumbstick.anchor_right = 0.58
+		thumbstick.offset_left = float(m["left"])
+		thumbstick.offset_right = 0.0
+		thumbstick.is_right_side = false
+
+	action_deck_margin.anchor_top = 1.0
+	action_deck_margin.anchor_bottom = 1.0
+	action_deck_margin.offset_top = -(bot_pad + cluster_h)
+	action_deck_margin.offset_bottom = -bot_pad
+
+	for aid in _action_btns:
+		var d: Dictionary = _action_btns[aid]
+		var slot: Control = d["slot"]
+		var raw_c: Vector2 = d["center"]
+		var bsz: float = float(d["btn_size"])
+		var cx := (cluster_w - raw_c.x) if left_handed else raw_c.x
+		slot.position = Vector2(cx - (bsz + 20.0) * 0.5, raw_c.y - bsz * 0.5)
+
 	thumbstick.queue_redraw()
 
 
@@ -361,12 +533,18 @@ func _on_hud_updated(state: Dictionary) -> void:
 
 	if director != null and director.class_def != null:
 		var hdef := director.class_def
-		if hdef.skill_1 != null:
-			(_action_btns["skill_1"]["name_lbl"] as Label).text = hdef.skill_1.display_name
-		if hdef.skill_2 != null:
-			(_action_btns["skill_2"]["name_lbl"] as Label).text = hdef.skill_2.display_name
-		if hdef.dash_ability != null:
-			(_action_btns["dash"]["name_lbl"] as Label).text = hdef.dash_ability.display_name
+		if hdef.skill_1 != null and _action_btns.has("skill_1"):
+			(_action_btns["skill_1"]["name_lbl"] as Label).text = _short_skill_label(hdef.skill_1, "TEMPEST")
+			(_action_btns["skill_1"]["icon"] as TextureRect).texture = UiThemeBuilder.get_skill_icon(hdef.skill_1.ability_id)
+		if hdef.skill_2 != null and _action_btns.has("skill_2"):
+			(_action_btns["skill_2"]["name_lbl"] as Label).text = _short_skill_label(hdef.skill_2, "PYRE")
+			(_action_btns["skill_2"]["icon"] as TextureRect).texture = UiThemeBuilder.get_skill_icon(hdef.skill_2.ability_id)
+		if hdef.skill_3 != null and _action_btns.has("skill_3"):
+			(_action_btns["skill_3"]["name_lbl"] as Label).text = _short_skill_label(hdef.skill_3, "STORM")
+			(_action_btns["skill_3"]["icon"] as TextureRect).texture = UiThemeBuilder.get_skill_icon(hdef.skill_3.ability_id)
+		if hdef.dash_ability != null and _action_btns.has("dash"):
+			(_action_btns["dash"]["name_lbl"] as Label).text = _short_skill_label(hdef.dash_ability, "DASH")
+			(_action_btns["dash"]["icon"] as TextureRect).texture = UiThemeBuilder.get_skill_icon(hdef.dash_ability.ability_id)
 
 
 func _update_live_cooldowns() -> void:
@@ -375,6 +553,8 @@ func _update_live_cooldowns() -> void:
 	var h := director.hero
 	_apply_cd_visual("skill_1", h.skill_1_cooldown_left, h.skill_1_cooldown_max)
 	_apply_cd_visual("skill_2", h.skill_2_cooldown_left, h.skill_2_cooldown_max)
+	if _action_btns.has("skill_3"):
+		_apply_cd_visual("skill_3", h.skill_3_cooldown_left, h.skill_3_cooldown_max)
 	_apply_cd_visual("dash", h.dash_cooldown_left, h.dash_cooldown_max)
 
 
@@ -382,18 +562,21 @@ func _apply_cd_visual(aid: String, cd_left: float, cd_max: float) -> void:
 	if not _action_btns.has(aid):
 		return
 	var d: Dictionary = _action_btns[aid]
-	var sweep: ColorRect = d["sweep"]
+	var dial: Control = d["dial"]
 	var cdlbl: Label = d["cd_lbl"]
+	var icon_tex: TextureRect = d["icon"]
 	if cd_left > 0.04:
 		var ratio := clampf(cd_left / maxf(0.1, cd_max), 0.0, 1.0)
-		sweep.anchor_top = 1.0 - ratio
-		sweep.visible = true
-		cdlbl.text = "%.1fs" % cd_left
-		cdlbl.add_theme_color_override("font_color", UiThemeBuilder.TEXT_GOLD)
+		dial.set_meta("ratio", ratio)
+		dial.visible = true
+		dial.queue_redraw()
+		cdlbl.visible = true
+		cdlbl.text = "%.1f" % cd_left if cd_left < 2.0 else "%d" % ceili(cd_left)
+		icon_tex.modulate = Color(0.55, 0.55, 0.62, 1.0)
 	else:
-		sweep.visible = false
-		cdlbl.text = "READY"
-		cdlbl.add_theme_color_override("font_color", UiThemeBuilder.TEXT_READY)
+		dial.visible = false
+		cdlbl.visible = false
+		icon_tex.modulate = Color.WHITE
 
 
 func _on_boss_updated(boss_name: String, boss_title: String, current_hp: float, max_hp: float, is_enraged: bool) -> void:
@@ -716,6 +899,8 @@ func _on_action_btn_pressed(aid: String) -> void:
 			director.press_skill_1()
 		"skill_2":
 			director.press_skill_2()
+		"skill_3":
+			director.press_skill_3()
 		"dash":
 			director.press_dash()
 

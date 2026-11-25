@@ -78,6 +78,8 @@ func _run_gate4() -> void:
 		_check(UiThemeBuilder.get_portrait(eid) != null, "Baked enemy portrait loaded: " + eid)
 	for ikey in ["zweihander", "halberd", "bastardsword", "blade_oarimaar", "runed_staff", "shield_round", "shield_heater", "shield_tower", "helm_iron", "helm_plume", "cuirass_plate", "waist_lantern"]:
 		_check(UiThemeBuilder.get_item_icon_by_key(ikey) != null, "Baked item icon loaded: " + ikey)
+	for skey in ["iron_tempest", "blackflame_pyre", "stormbrand_arc", "iron_roll"]:
+		_check(UiThemeBuilder.get_skill_icon(skey) != null, "Baked skill icon loaded: " + skey)
 
 	var shell_ps := load("res://scenes/ui/main_shell.tscn") as PackedScene
 	_check(shell_ps != null, "main_shell.tscn loads cleanly")
@@ -98,11 +100,11 @@ func _run_gate4() -> void:
 	gs.call("equip_item", "oathbreaker", showcase_sword.uid)
 	gs.set("inventory", [] as Array[EquipmentItem])
 
-	gs.set("unlocked_zones", ["fringe", "weald", "catacombs"] as Array[String])
-	gs.set("cleared_zones", {"fringe": [0, 1], "weald": [0]})
+	gs.set("unlocked_zones", ["fringe"] as Array[String])
+	gs.set("cleared_zones", {})
 	gs.set("gold", 840)
 	gs.set("scrap", 96)
-	gs.call("select_zone", "weald")
+	gs.call("select_zone", "fringe")
 	gs.call("select_difficulty", GameEnums.Difficulty.VETERAN)
 	shell.refresh_header()
 	shell.hunt_tab.refresh_ui()
@@ -110,7 +112,11 @@ func _run_gate4() -> void:
 
 	var embark_rect := shell.hunt_tab.embark_btn.get_global_rect()
 	var nav_rect := shell.nav_panel.get_global_rect()
+	var stage_hunt_rect := shell.hunt_tab.stage_3d.get_global_rect()
+	var hero_row_rect := shell.hunt_tab.hero_Cards_row.get_global_rect()
 	_check(embark_rect.end.y <= nav_rect.position.y + 1.0, "Embark CTA fits cleanly above bottom dock without overlap")
+	_check(stage_hunt_rect.size.y >= 460.0, "Sanctum 3D stage has generous mobile vertical height (got %.1f)" % stage_hunt_rect.size.y)
+	_check(stage_hunt_rect.end.y <= hero_row_rect.position.y + 1.0, "Sanctum 3D stage does not overlap hero cards row")
 
 	var shot1 := await _capture_viewport_image()
 	shot1.save_png(_out_dir.path_join("01_sanctum_hunt_tab.png"))
@@ -171,6 +177,10 @@ func _run_gate4() -> void:
 	var right_rect := shell.armory_tab.right_sockets_box.get_global_rect()
 	_check(left_rect.end.x <= stage_rect.position.x + 1.0, "Left sockets do not overlap 3D Sanctuary stage")
 	_check(stage_rect.end.x <= right_rect.position.x + 1.0, "Right sockets do not overlap 3D Sanctuary stage")
+	var bag_rect := shell.armory_tab.bag_panel.get_global_rect()
+	var insp_rect := shell.armory_tab.inspector_panel.get_global_rect()
+	_check(insp_rect.end.y <= bag_rect.position.y + 1.0, "Armory inspector does not overlap satchel grid")
+	_check(bag_rect.end.y <= shell.nav_panel.get_global_rect().position.y + 1.0, "Armory satchel fits cleanly above bottom dock")
 
 	var shot2 := await _capture_viewport_image()
 	shot2.save_png(_out_dir.path_join("02_armory_tab.png"))
@@ -232,8 +242,10 @@ func _run_gate4() -> void:
 
 	var boss := arena.spawn_boss_encounter()
 	_check(boss != null, "Guardian boss spawned in arena")
+	if boss != null:
+		boss.global_position = Vector3(0.0, 0.0, -49.0)
 	if arena.hero != null:
-		arena.hero.global_position = boss.global_position + Vector3(0.0, 0.0, 3.2)
+		arena.hero.global_position = Vector3(0.0, 0.0, -45.5)
 		arena._snap_camera_to_hero()
 		arena.hero.ward_hp = 65.0
 		arena.collected_gold = 148
@@ -252,6 +264,17 @@ func _run_gate4() -> void:
 
 	_check(hud.boss_panel.visible, "Guardian Boss HP bar visible during boss fight")
 	_check(hud.floaters_layer.get_child_count() >= 2, "Floating 2D damage numbers active on HUD")
+	_check(hud.thumbstick.floating, "VirtualThumbstick operates in floating mode")
+	_check(hud.skill1_btn != null and hud.skill2_btn != null and hud.skill3_btn != null and hud.dash_btn != null, "All 4 circular skill & dash buttons present")
+	var action_btns: Array[Button] = [hud.skill1_btn, hud.skill2_btn, hud.skill3_btn, hud.dash_btn]
+	for i in range(action_btns.size()):
+		var r_a := action_btns[i].get_global_rect()
+		_check(r_a.position.x >= hud.thumbstick.get_global_rect().end.x - 1.0, "Circular action button %d clear of thumbstick zone" % i)
+		for j in range(i + 1, action_btns.size()):
+			var r_b := action_btns[j].get_global_rect()
+			_check(not r_a.intersects(r_b), "Circular action buttons %d and %d do not overlap" % [i, j])
+	var sm := UiThemeBuilder.get_safe_margins(hud.root_ctrl)
+	_check(sm.has("top") and sm.has("bottom") and sm.has("left") and sm.has("right"), "Safe margins dictionary returns all 4 insets")
 
 	var shot4 := await _capture_viewport_image()
 	shot4.save_png(_out_dir.path_join("04_live_combat_hud.png"))
@@ -297,7 +320,7 @@ func _run_gate4() -> void:
 	_check(shell.active_arena == null and shell.active_hud == null and shell.hub_layer.visible, "Arena cleanly torn down on Return to Sanctum")
 
 	shell.queue_free()
-	await _wait_frames(2)
+	await _wait_frames(3)
 	if ad != null and ad.has_method("_exit_tree"):
 		ad.call("_exit_tree")
 	if gs != null and is_instance_valid(gs):
@@ -306,7 +329,15 @@ func _run_gate4() -> void:
 	if ad != null and is_instance_valid(ad):
 		root.remove_child(ad)
 		ad.free()
+	var ota := root.get_node_or_null("Ota")
+	if ota != null and is_instance_valid(ota):
+		root.remove_child(ota)
+		ota.free()
+	UiThemeBuilder.clear_cache()
+	await _wait_frames(2)
 	await create_timer(0.05).timeout
+	var orphans := roundi(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+	_check(orphans == 0, "Zero orphan nodes at UI verification teardown (got %d)" % orphans)
 	_restore_save()
 
 	if _checks_failed > 0:

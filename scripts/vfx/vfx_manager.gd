@@ -348,17 +348,6 @@ func spawn_blackflame_bolt_vfx(projectile_parent: Node3D) -> void:
 	holder.name = "BlackflameBoltVfx"
 	projectile_parent.add_child(holder)
 
-	var core := MeshInstance3D.new()
-	var sph := SphereMesh.new()
-	sph.radius = 0.15
-	sph.height = 0.30
-	core.mesh = sph
-	var core_mat := StandardMaterial3D.new()
-	core_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	core_mat.albedo_color = Color(5.2, 2.3, 0.52, 1.0)
-	core.material_override = core_mat
-	holder.add_child(core)
-
 	if _flame_shader != null:
 		var corona_mat := ShaderMaterial.new()
 		corona_mat.shader = _flame_shader

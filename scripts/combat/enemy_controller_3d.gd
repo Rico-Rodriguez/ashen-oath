@@ -62,6 +62,7 @@ var _bleed_timer: float = 0.0
 var _bleed_tick_accum: float = 0.0
 
 var _death_cleanup_timer: float = 0.75
+var _knockback_vel: Vector3 = Vector3.ZERO
 
 
 func _ready() -> void:
@@ -113,6 +114,7 @@ func setup(
 	_boss_stampede_pyres_spawned = 0
 	last_signature_tag = ""
 	signature_exec_counts.clear()
+	_knockback_vel = Vector3.ZERO
 	_cancel_telegraphs_and_pending()
 
 	_mount_visual()
@@ -173,6 +175,7 @@ func _physics_process(delta: float) -> void:
 			visual.play_anim("idle", 1.0, false)
 		return
 
+	_knockback_vel = _knockback_vel.move_toward(Vector3.ZERO, 24.0 * delta)
 	match state:
 		State.IDLE:
 			_process_idle(hero)
@@ -187,7 +190,10 @@ func _physics_process(delta: float) -> void:
 		State.STAGGER:
 			_process_stagger(delta)
 
+	if _knockback_vel.length_squared() > 0.0004:
+		velocity += _knockback_vel
 	move_and_slide()
+	_enforce_hero_separation(hero)
 	_constrain_to_ground_and_bounds()
 	_update_locomotion_visual()
 
@@ -495,9 +501,9 @@ func _process_windup(_hero: Node3D, delta: float) -> void:
 		GameEnums.EnemyArchetype.RANGED:
 			_state_timer = 0.16
 			if visual != null:
-				visual.play_anim("attack", 1.25, true)
+				visual.play_anim("skill_cast" if visual.is_unified_kit() else "attack", 1.25, true)
 			_play_sfx("atk_enemy")
-			_fire_enemy_projectile(_locked_dir, 11.5, attack_damage, "blood_orb", DamageEvent.Kind.SHADOW)
+			_fire_enemy_projectile(_locked_dir, 11.5, attack_damage, "blackflame_bolt", DamageEvent.Kind.FIRE)
 			_executed_hit = true
 		GameEnums.EnemyArchetype.CHARGER:
 			_state_timer = 10.5 / 14.5
@@ -589,11 +595,13 @@ func _enter_boss_execute() -> void:
 					_execute_duration = 0.24
 					_state_timer = _execute_duration
 					if visual != null:
-						visual.play_anim("attack", 1.15, true)
+						visual.play_anim("skill_slam" if visual.is_unified_kit() else "attack", 1.15, true)
 					_record_signature("troll_seismic_slam")
 				1:
 					_execute_duration = 0.40
 					_state_timer = _execute_duration
+					if visual != null and visual.is_unified_kit():
+						visual.play_anim("attack_2", 1.10, true)
 					_record_signature("troll_boulder_tremors")
 				2:
 					_execute_duration = 13.0 / 16.0
@@ -808,6 +816,8 @@ func _finish_boss_execute(hero: Node3D, h_rad: float) -> bool:
 
 	elif bid == "barrow_troll":
 		if _active_boss_move == 2 and is_enraged:
+			if visual != null and visual.is_unified_kit():
+				visual.play_anim("attack_1", 1.25, true)
 			_fire_boss_ember_fan(hero)
 
 	return false
@@ -1027,6 +1037,11 @@ func receive_damage(ev: DamageEvent) -> DamageEvent:
 		_enter_dead_state()
 		return ev
 
+	if ev.knockback_impulse.length_squared() > 0.0001 and dmg > 0.0:
+		var kb_mult := 0.25 if enemy_def.is_boss else (0.55 if enemy_def.archetype == GameEnums.EnemyArchetype.BRUISER else 1.0)
+		if not (enemy_def.is_boss and state == State.EXECUTE):
+			_knockback_vel = Vector3(ev.knockback_impulse.x, 0.0, ev.knockback_impulse.z) * kb_mult
+
 	if enemy_def.is_boss and not is_enraged and current_hp <= max_hp * 0.55:
 		_trigger_boss_enrage()
 
@@ -1054,6 +1069,7 @@ func _trigger_boss_enrage() -> void:
 	move_speed *= 1.15
 	if visual != null:
 		visual.play_anim("skill_cast", 1.15, true)
+		visual.set_enrage_embers(true)
 	_play_sfx("boss_roar")
 	var ad := _audio()
 	if ad != null and ad.has_method("duck"):
@@ -1272,6 +1288,21 @@ func _constrain_to_ground_and_bounds() -> void:
 	var p := _clamp_pos(global_position)
 	p.y = 0.0
 	global_position = p
+
+
+func _enforce_hero_separation(hero: Node3D) -> void:
+	if state == State.DEAD or hero == null or not is_instance_valid(hero):
+		return
+	if state == State.EXECUTE or (enemy_def.is_boss and state == State.RECOVER):
+		return
+	var min_sep := _hero_radius(hero) + body_radius + 0.15
+	var delta_xz := Vector3(global_position.x - hero.global_position.x, 0.0, global_position.z - hero.global_position.z)
+	var d := delta_xz.length()
+	if d < min_sep:
+		var push_dir := delta_xz / d if d > 0.001 else -_locked_dir
+		if push_dir.length_squared() < 0.0001:
+			push_dir = Vector3.BACK
+		global_position = _clamp_pos(Vector3(hero.global_position.x, 0.0, hero.global_position.z) + push_dir.normalized() * min_sep)
 
 
 func _clamp_pos(p: Vector3) -> Vector3:

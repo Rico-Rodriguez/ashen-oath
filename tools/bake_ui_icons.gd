@@ -2,6 +2,225 @@ extends SceneTree
 
 const PORTRAIT_DIR := "res://assets/sprites/ui/portraits"
 const ITEM_DIR := "res://assets/sprites/ui/items"
+const SKILL_DIR := "res://assets/sprites/ui/skills"
+
+const SKILL_ICON_SHADER := """
+shader_type canvas_item;
+
+uniform int icon_id = 0;
+
+float hash21(vec2 p) {
+	p = fract(p * vec2(123.34, 456.21));
+	p += dot(p, p + 45.32);
+	return fract(p.x * p.y);
+}
+
+float noise2(vec2 p) {
+	vec2 i = floor(p);
+	vec2 f = fract(p);
+	vec2 u = f * f * (3.0 - 2.0 * f);
+	return mix(
+		mix(hash21(i), hash21(i + vec2(1.0, 0.0)), u.x),
+		mix(hash21(i + vec2(0.0, 1.0)), hash21(i + vec2(1.0, 1.0)), u.x),
+		u.y
+	);
+}
+
+float fbm(vec2 p) {
+	float v = 0.0;
+	float a = 0.5;
+	for (int i = 0; i < 4; i++) {
+		v += noise2(p) * a;
+		p = mat2(vec2(1.6, 1.2), vec2(-1.2, 1.6)) * p + vec2(7.1, 11.3);
+		a *= 0.5;
+	}
+	return v;
+}
+
+float sd_seg(vec2 p, vec2 a, vec2 b) {
+	vec2 pa = p - a;
+	vec2 ba = b - a;
+	float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-5), 0.0, 1.0);
+	return length(pa - ba * h);
+}
+
+float sd_crescent(vec2 p, float r, float w, float ang_start, float ang_end) {
+	float a = atan(p.y, p.x);
+	float d_ang = mod(a - ang_start + 6.2831853, 6.2831853);
+	float span = mod(ang_end - ang_start + 6.2831853, 6.2831853);
+	float t = clamp(d_ang / max(span, 0.001), 0.0, 1.0);
+	float arc_clip = max(0.0, max(ang_start - a, a - ang_end));
+	if (d_ang <= span) {
+		float taper = sin(t * 3.14159265);
+		float half_w = w * (0.14 + 0.86 * pow(taper, 0.65));
+		return abs(length(p) - r) - half_w;
+	}
+	vec2 p0 = vec2(cos(ang_start), sin(ang_start)) * r;
+	vec2 p1 = vec2(cos(ang_end), sin(ang_end)) * r;
+	return min(length(p - p0), length(p - p1));
+}
+
+float sd_tri_seg(vec2 p, vec2 a, vec2 b, float r0, float r1) {
+	vec2 pa = p - a;
+	vec2 ba = b - a;
+	float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-5), 0.0, 1.0);
+	return length(pa - ba * h) - mix(r0, r1, h);
+}
+
+void fragment() {
+	vec2 uv = (UV - 0.5) * 2.0;
+	float r = length(uv);
+	float outer_mask = 1.0 - smoothstep(0.955, 0.985, r);
+
+	vec3 bg = mix(vec3(0.082, 0.092, 0.120), vec3(0.028, 0.032, 0.044), smoothstep(0.0, 0.92, r));
+	float grain = noise2(uv * 16.0) * 0.028;
+	bg += grain;
+
+	float inner_ring = smoothstep(0.014, 0.0, abs(r - 0.80));
+	bg = mix(bg, vec3(0.26, 0.21, 0.14), inner_ring * 0.55);
+
+	vec3 col = bg;
+
+	if (icon_id == 0) {
+		float glow_ring = exp(-abs(r - 0.54) * 9.0) * 0.42;
+		col += vec3(0.88, 0.36, 0.08) * glow_ring;
+
+		float d1 = sd_crescent(uv, 0.52, 0.115, -0.35, 2.35);
+		float d2 = sd_crescent(uv, 0.52, 0.115, 2.79, 5.49);
+		float d_blade = min(d1, d2);
+		float blade_fill = 1.0 - smoothstep(-0.010, 0.010, d_blade);
+		float blade_edge = exp(-max(d_blade, 0.0) * 28.0);
+		float radial_mid = abs(r - 0.52);
+		float fuller = 1.0 - smoothstep(0.015, 0.055, radial_mid);
+		float outer_edge = smoothstep(0.54, 0.63, r) * blade_fill;
+		float spec = clamp(0.42 + 0.58 * (uv.x * -0.6 + uv.y * -0.8), 0.15, 1.0);
+		vec3 steel = mix(vec3(0.24, 0.28, 0.36), vec3(0.76, 0.82, 0.90), spec);
+		steel = mix(steel, vec3(0.14, 0.16, 0.22), fuller * 0.55);
+		steel = mix(steel, vec3(0.98, 0.99, 1.0), outer_edge * 0.85);
+		col = mix(col, steel, blade_fill);
+		col += vec3(1.0, 0.52, 0.12) * blade_edge * 0.62;
+
+		float d_inner = sd_crescent(uv, 0.28, 0.048, 0.5, 2.8);
+		float d_inner2 = sd_crescent(uv, 0.28, 0.048, 3.64, 5.94);
+		float inner_b = 1.0 - smoothstep(-0.01, 0.01, min(d_inner, d_inner2));
+		col = mix(col, vec3(0.70, 0.76, 0.86), inner_b * 0.88);
+
+		float hub = 1.0 - smoothstep(0.105, 0.128, r);
+		float hub_rim = smoothstep(0.018, 0.0, abs(r - 0.115));
+		col = mix(col, vec3(0.11, 0.12, 0.16), hub);
+		col = mix(col, vec3(0.92, 0.72, 0.34), hub_rim);
+		col += vec3(1.0, 0.72, 0.28) * (1.0 - smoothstep(0.0, 0.045, r)) * 0.85;
+
+		for (int i = 0; i < 8; i++) {
+			float fi = float(i);
+			float ang = fi * 0.7854 + 0.32;
+			vec2 sp = vec2(cos(ang), sin(ang)) * (0.44 + 0.22 * fract(fi * 0.37));
+			float sd = length(uv - sp);
+			col += vec3(1.0, 0.72, 0.24) * exp(-sd * 36.0) * 0.95;
+		}
+	} else if (icon_id == 1) {
+		float py = uv.y + 0.05;
+		float px = uv.x;
+		float turb = fbm(vec2(px * 4.4, py * 3.8 + 1.7));
+		float height_t = clamp((0.52 - py) / 1.18, 0.0, 1.0);
+		float tip_fade = smoothstep(-0.68, -0.34, py);
+		float flame_w = (mix(0.45, 0.015, pow(height_t, 0.82)) + (turb - 0.46) * 0.19 * (0.28 + height_t * 0.65)) * tip_fade;
+		float flame_dist = abs(px) - flame_w;
+		if (py > 0.46) flame_dist = max(flame_dist, py - 0.46);
+		if (py < -0.66) flame_dist = max(flame_dist, -0.66 - py);
+
+		float outer_f = 1.0 - smoothstep(-0.02, 0.035, flame_dist);
+		float mid_f = 1.0 - smoothstep(-0.02, 0.03, flame_dist + 0.095);
+		float core_f = 1.0 - smoothstep(-0.015, 0.025, flame_dist + 0.20);
+		float halo = exp(-max(flame_dist, 0.0) * 6.8) * smoothstep(-0.74, -0.45, py);
+
+		col += vec3(0.95, 0.30, 0.06) * halo * 0.72;
+		vec3 soot = vec3(0.035, 0.028, 0.045);
+		vec3 rim_ember = vec3(1.0, 0.42, 0.07);
+		vec3 core_gold = vec3(1.0, 0.90, 0.52);
+		col = mix(col, soot, outer_f * 0.92);
+		float rim_band = clamp(outer_f - mid_f * 0.72, 0.0, 1.0);
+		col += rim_ember * rim_band * 1.45;
+		col = mix(col, mix(rim_ember, vec3(1.0, 0.64, 0.14), height_t * 0.45 + 0.30), mid_f * 0.90);
+		col = mix(col, core_gold, core_f * (1.0 - height_t * 0.45));
+
+		for (int i = 0; i < 4; i++) {
+			float fi = float(i);
+			vec2 ep = vec2((fi - 1.5) * 0.18, -0.48 - 0.06 * sin(fi * 2.1));
+			col += vec3(1.0, 0.68, 0.20) * exp(-length(uv - ep) * 28.0);
+		}
+
+		float d_bowl = max(abs(uv.y - 0.54) - 0.085, abs(uv.x) - mix(0.44, 0.28, (uv.y - 0.45) * 4.0));
+		float bowl_m = 1.0 - smoothstep(-0.01, 0.015, d_bowl);
+		col = mix(col, vec3(0.16, 0.17, 0.21), bowl_m);
+		col = mix(col, vec3(0.88, 0.68, 0.30), (1.0 - smoothstep(-0.01, 0.01, max(abs(uv.y - 0.46) - 0.022, abs(uv.x) - 0.45))));
+	} else if (icon_id == 2) {
+		float ring_arc = exp(-abs(r - 0.66) * 16.0) * (0.45 + 0.55 * sin(atan(uv.y, uv.x) * 6.0));
+		col += vec3(0.14, 0.64, 1.0) * max(ring_arc, 0.0) * 0.45;
+
+		vec2 p0 = vec2(0.32, -0.64);
+		vec2 p1 = vec2(-0.22, -0.06);
+		vec2 p2 = vec2(0.12, -0.04);
+		vec2 p3 = vec2(-0.34, 0.64);
+
+		float d_bolt = min(
+			sd_tri_seg(uv, p0, p1, 0.012, 0.072),
+			min(sd_tri_seg(uv, p1, p2, 0.064, 0.058), sd_tri_seg(uv, p2, p3, 0.068, 0.008))
+		);
+		float b1 = sd_tri_seg(uv, p1, vec2(-0.56, 0.20), 0.026, 0.005);
+		float b2 = sd_tri_seg(uv, p2, vec2(0.50, 0.20), 0.028, 0.005);
+		float b3 = sd_tri_seg(uv, mix(p0, p1, 0.48), vec2(0.38, -0.22), 0.022, 0.004);
+		float d_all = min(d_bolt, min(b1, min(b2, b3)));
+
+		float corona = exp(-max(d_all, 0.0) * 10.0);
+		float outer_glow = exp(-max(d_all, 0.0) * 28.0);
+		float core = 1.0 - smoothstep(-0.010, 0.010, d_all);
+		float spine = 1.0 - smoothstep(-0.028, 0.0, d_bolt);
+
+		col += vec3(0.08, 0.46, 0.98) * corona * 0.92;
+		col += vec3(0.28, 0.85, 1.0) * outer_glow * 1.05;
+		col = mix(col, vec3(0.45, 0.92, 1.0), core);
+		col = mix(col, vec3(0.97, 0.99, 1.0), spine);
+	} else {
+		for (int i = 0; i < 3; i++) {
+			float fi = float(i);
+			float yo = (fi - 1.0) * 0.21;
+			float d_streak = sd_tri_seg(uv, vec2(-0.62, yo), vec2(-0.18 + fi * 0.04, yo), 0.004, 0.020);
+			col += vec3(0.58, 0.82, 1.0) * exp(-max(d_streak, 0.0) * 24.0) * 0.72;
+			col += vec3(1.0, 0.68, 0.28) * exp(-max(d_streak, 0.0) * 34.0) * 0.45;
+		}
+
+		for (int c = 0; c < 2; c++) {
+			float ox = (c == 0) ? -0.14 : 0.22;
+			float sc = (c == 0) ? 0.88 : 1.06;
+			vec2 q = uv - vec2(ox, 0.0);
+			float ax = abs(q.y);
+			float x_edge = 0.24 * sc - ax * 1.25;
+			float d_chev = max(max(q.x - x_edge, (x_edge - 0.16 * sc) - q.x), ax - 0.34 * sc);
+			float fill = 1.0 - smoothstep(-0.010, 0.010, d_chev);
+			float rim = exp(-max(d_chev, 0.0) * 28.0);
+			vec3 facet = (q.y < 0.0) ? vec3(0.84, 0.89, 0.96) : vec3(0.36, 0.40, 0.48);
+			if (c == 1) {
+				float ridge = 1.0 - smoothstep(0.0, 0.045, abs(q.x - (x_edge - 0.08 * sc)));
+				facet = mix(facet, vec3(0.96, 0.76, 0.34), ridge * 0.72);
+			}
+			col += vec3(0.95, 0.68, 0.26) * rim * 0.65;
+			col = mix(col, facet, fill);
+		}
+	}
+
+	float gold_ring = smoothstep(0.875, 0.895, r) * (1.0 - smoothstep(0.955, 0.975, r));
+	float bevel_hl = clamp(0.55 + 0.45 * (-uv.x * 0.7 - uv.y * 0.7), 0.2, 1.0);
+	float ring_arch = sin(clamp((r - 0.88) / 0.085, 0.0, 1.0) * 3.14159265);
+	vec3 gold_col = mix(vec3(0.40, 0.29, 0.13), vec3(0.96, 0.80, 0.44), bevel_hl * (0.45 + 0.55 * ring_arch));
+	col = mix(col, gold_col, gold_ring);
+
+	float dark_in_rim = smoothstep(0.855, 0.875, r) * (1.0 - smoothstep(0.875, 0.892, r));
+	col = mix(col, vec3(0.03, 0.03, 0.04), dark_in_rim * 0.85);
+
+	COLOR = vec4(col, outer_mask);
+}
+"""
 
 var _preview_sheet_path: String = ""
 
@@ -14,10 +233,10 @@ const HERO_SPECS := [
 		"off": "",
 		"plume": true,
 		"lantern": Color(1.0, 0.68, 0.22),
-		"cam_pos": Vector3(-0.56, 1.69, -2.10),
-		"look_at": Vector3(0.02, 1.60, 0.0),
-		"fov": 28.0,
-		"rim_col": Color(1.0, 0.56, 0.22),
+		"cam_pos": Vector3(-0.62, 1.62, -2.26),
+		"look_at": Vector3(0.0, 1.48, 0.0),
+		"fov": 29.0,
+		"rim_col": Color(1.0, 0.56, 0.20),
 	},
 	{
 		"id": "battlemage",
@@ -51,20 +270,20 @@ const ENEMY_SPECS := [
 	{
 		"id": "hollow_ghoul",
 		"scene": "res://scenes/actors/enemies/hollow_ghoul.tscn",
-		"cam_rel": Vector3(-0.34, 0.78, -0.95),
-		"look_y": 0.73,
-		"dist_mult": 1.05,
+		"cam_rel": Vector3(-0.32, 0.72, -0.96),
+		"look_y": 0.78,
+		"dist_mult": 1.06,
 		"fov": 30.0,
-		"rim_col": Color(0.45, 0.85, 0.62),
+		"rim_col": Color(1.0, 0.45, 0.16),
 	},
 	{
 		"id": "crypt_batlord",
 		"scene": "res://scenes/actors/enemies/crypt_batlord.tscn",
-		"cam_rel": Vector3(-0.28, 0.66, -1.0),
-		"look_y": 0.60,
-		"dist_mult": 1.48,
-		"fov": 32.0,
-		"rim_col": Color(0.95, 0.24, 0.34),
+		"cam_rel": Vector3(-0.34, 0.76, -0.98),
+		"look_y": 0.78,
+		"dist_mult": 1.14,
+		"fov": 31.0,
+		"rim_col": Color(1.0, 0.36, 0.12),
 	},
 	{
 		"id": "ash_scorpion",
@@ -78,11 +297,11 @@ const ENEMY_SPECS := [
 	{
 		"id": "stone_gargoyle",
 		"scene": "res://scenes/actors/enemies/stone_gargoyle.tscn",
-		"cam_rel": Vector3(-0.34, 0.78, -0.96),
-		"look_y": 0.72,
-		"dist_mult": 1.12,
-		"fov": 30.0,
-		"rim_col": Color(0.56, 0.70, 0.96),
+		"cam_rel": Vector3(-0.36, 0.74, -0.96),
+		"look_y": 0.68,
+		"dist_mult": 1.08,
+		"fov": 31.0,
+		"rim_col": Color(1.0, 0.52, 0.18),
 	},
 	{
 		"id": "dread_golem",
@@ -105,11 +324,11 @@ const ENEMY_SPECS := [
 	{
 		"id": "barrow_troll",
 		"scene": "res://scenes/actors/enemies/barrow_troll.tscn",
-		"cam_rel": Vector3(-0.34, 0.76, -0.96),
-		"look_y": 0.70,
-		"dist_mult": 1.06,
-		"fov": 30.0,
-		"rim_col": Color(1.0, 0.42, 0.14),
+		"cam_rel": Vector3(-0.36, 0.78, -0.96),
+		"look_y": 0.75,
+		"dist_mult": 1.16,
+		"fov": 31.0,
+		"rim_col": Color(1.0, 0.38, 0.10),
 	},
 	{
 		"id": "blight_werewolf",
@@ -120,6 +339,13 @@ const ENEMY_SPECS := [
 		"fov": 30.0,
 		"rim_col": Color(0.52, 0.96, 0.28),
 	},
+]
+
+const SKILL_KEYS := [
+	{"id": "iron_tempest", "shader_id": 0},
+	{"id": "blackflame_pyre", "shader_id": 1},
+	{"id": "stormbrand_arc", "shader_id": 2},
+	{"id": "iron_roll", "shader_id": 3},
 ]
 
 const ITEM_KEYS := [
@@ -147,6 +373,7 @@ func _init() -> void:
 		_preview_sheet_path = ProjectSettings.globalize_path("user://shots").path_join("baked_icons_sheet.png")
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(PORTRAIT_DIR))
 	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(ITEM_DIR))
+	DirAccess.make_dir_recursive_absolute(ProjectSettings.globalize_path(SKILL_DIR))
 	DirAccess.make_dir_recursive_absolute(_preview_sheet_path.get_base_dir())
 	call_deferred("_bake_all")
 
@@ -165,10 +392,14 @@ func _bake_all() -> void:
 	for key in ITEM_KEYS:
 		item_jobs.append(_build_item_stage(key))
 
+	var skill_jobs: Array[Dictionary] = []
+	for sspec in SKILL_KEYS:
+		skill_jobs.append(_build_skill_icon_stage(str(sspec["id"]), int(sspec["shader_id"])))
+
 	for _f in range(8):
 		await RenderingServer.frame_post_draw
 
-	var sheet := Image.create(256 * 6, 256 * 4, false, Image.FORMAT_RGBA8)
+	var sheet := Image.create(256 * 6, 256 * 5, false, Image.FORMAT_RGBA8)
 	sheet.fill(Color(0.04, 0.04, 0.05, 1.0))
 	var sheet_idx := 0
 
@@ -211,10 +442,53 @@ func _bake_all() -> void:
 		sheet_idx += 1
 		vp.queue_free()
 
+	for job in skill_jobs:
+		var vp: SubViewport = job["vp"]
+		var img := vp.get_texture().get_image()
+		img.convert(Image.FORMAT_RGBA8)
+		img.resize(128, 128, Image.INTERPOLATE_LANCZOS)
+		var out_path := "%s/%s.png" % [SKILL_DIR, str(job["id"])]
+		var err := img.save_png(ProjectSettings.globalize_path(out_path))
+		if err != OK:
+			printerr("Failed saving skill icon: ", out_path)
+		else:
+			print("Baked skill icon: ", out_path)
+		var preview_up := img.duplicate() as Image
+		preview_up.resize(256, 256, Image.INTERPOLATE_BILINEAR)
+		var sx := (sheet_idx % 6) * 256
+		var sy := (sheet_idx / 6) * 256
+		if sy + 256 <= sheet.get_height():
+			sheet.blit_rect(preview_up, Rect2i(0, 0, 256, 256), Vector2i(sx, sy))
+		sheet_idx += 1
+		vp.queue_free()
+
 	sheet.save_png(_preview_sheet_path)
 	print("Saved preview contact sheet: ", _preview_sheet_path)
 	await process_frame
 	quit(0)
+
+
+func _build_skill_icon_stage(skill_id: String, shader_id: int) -> Dictionary:
+	var vp := SubViewport.new()
+	vp.size = Vector2i(512, 512)
+	vp.transparent_bg = true
+	vp.render_target_update_mode = SubViewport.UPDATE_ALWAYS
+	root.add_child(vp)
+
+	var sh := Shader.new()
+	sh.code = SKILL_ICON_SHADER
+	var smat := ShaderMaterial.new()
+	smat.shader = sh
+	smat.set_shader_parameter("icon_id", shader_id)
+
+	var rect := ColorRect.new()
+	rect.set_anchors_preset(Control.PRESET_TOP_LEFT)
+	rect.position = Vector2.ZERO
+	rect.size = Vector2(512, 512)
+	rect.material = smat
+	vp.add_child(rect)
+
+	return {"vp": vp, "id": skill_id}
 
 
 func _make_studio_viewport(vp_size: Vector2i, bg_col: Color, rim_col: Color, key_energy: float = 2.45) -> Dictionary:
@@ -274,6 +548,15 @@ func _make_studio_viewport(vp_size: Vector2i, bg_col: Color, rim_col: Color, key
 	}
 
 
+func _get_actor_bone_world(actor: ActorVisual, bone_name: String, fallback: Vector3) -> Vector3:
+	if actor == null or actor.skeleton == null:
+		return fallback
+	var idx := actor.skeleton.find_bone(bone_name)
+	if idx < 0:
+		return fallback
+	return actor.skeleton.global_transform * actor.skeleton.get_bone_global_pose(idx).origin
+
+
 func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
 	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.095), spec["rim_col"] as Color, 2.55)
 	var ps := load(str(spec["scene"])) as PackedScene
@@ -295,7 +578,19 @@ func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
 
 	var cam: Camera3D = st["cam"]
 	cam.fov = float(spec["fov"])
-	cam.look_at_from_position(spec["cam_pos"] as Vector3, spec["look_at"] as Vector3, Vector3.UP)
+	if actor.is_unified_kit():
+		var chest_p := _get_actor_bone_world(actor, "chest", Vector3(0.0, 1.32, 0.0))
+		var head_p := _get_actor_bone_world(actor, "head", Vector3(0.0, 1.66, 0.0))
+		var focus := chest_p.lerp(head_p, 0.56)
+		var fill_warm := OmniLight3D.new()
+		fill_warm.light_color = Color(1.0, 0.68, 0.34)
+		fill_warm.light_energy = 1.65
+		fill_warm.omni_range = 5.0
+		fill_warm.position = focus + Vector3(0.85, 0.25, -1.15)
+		(st["vp"] as SubViewport).add_child(fill_warm)
+		cam.look_at_from_position(focus + Vector3(-0.48, 0.08, -2.14), focus + Vector3(0.0, 0.06, 0.0), Vector3.UP)
+	else:
+		cam.look_at_from_position(spec["cam_pos"] as Vector3, spec["look_at"] as Vector3, Vector3.UP)
 	st["id"] = str(spec["id"])
 	return st
 
@@ -311,27 +606,50 @@ func _build_enemy_portrait_stage(spec: Dictionary) -> Dictionary:
 		actor.anim_player.advance(0.08)
 
 	var h := maxf(1.2, actor.height_meters)
-	var look_target := Vector3(0.0, h * float(spec["look_y"]), 0.0)
-	var rel: Vector3 = spec["cam_rel"]
-	var dist := h * 0.92 * float(spec["dist_mult"])
-	var cam_pos := Vector3(rel.x * dist, h * rel.y, rel.z * dist)
-
-	(st["key"] as DirectionalLight3D).look_at_from_position(
-		Vector3(-dist * 1.2, h * 1.4, -dist * 1.4),
-		look_target,
-		Vector3.UP
-	)
-	(st["cool_rim"] as DirectionalLight3D).look_at_from_position(
-		Vector3(dist * 1.2, h * 1.2, dist * 1.3),
-		look_target,
-		Vector3.UP
-	)
-	(st["accent_rim"] as OmniLight3D).position = Vector3(-dist * 0.75, h * 0.85, dist * 0.65)
-	(st["accent_rim"] as OmniLight3D).omni_range = maxf(6.5, h * 3.0)
-
 	var cam: Camera3D = st["cam"]
 	cam.fov = float(spec["fov"])
-	cam.look_at_from_position(cam_pos, look_target, Vector3.UP)
+
+	if actor.is_unified_kit():
+		var chest_p := _get_actor_bone_world(actor, "chest", Vector3(0.0, h * 0.64, 0.0))
+		var head_p := _get_actor_bone_world(actor, "head", Vector3(0.0, h * 0.84, 0.0))
+		var look_target := chest_p.lerp(head_p, 0.60)
+		var dist := h * 0.96 * float(spec["dist_mult"])
+		var rel: Vector3 = spec["cam_rel"]
+		var cam_pos := look_target + Vector3(rel.x * dist, (rel.y - 0.78) * dist * 0.5, rel.z * dist)
+
+		(st["key"] as DirectionalLight3D).look_at_from_position(
+			look_target + Vector3(-dist * 1.2, h * 0.8, -dist * 1.4),
+			look_target,
+			Vector3.UP
+		)
+		(st["cool_rim"] as DirectionalLight3D).look_at_from_position(
+			look_target + Vector3(dist * 1.2, h * 0.6, dist * 1.3),
+			look_target,
+			Vector3.UP
+		)
+		(st["accent_rim"] as OmniLight3D).position = look_target + Vector3(-dist * 0.75, 0.25, dist * 0.65)
+		(st["accent_rim"] as OmniLight3D).omni_range = maxf(6.5, h * 3.0)
+		cam.look_at_from_position(cam_pos, look_target, Vector3.UP)
+	else:
+		var look_target := Vector3(0.0, h * float(spec["look_y"]), 0.0)
+		var rel: Vector3 = spec["cam_rel"]
+		var dist := h * 0.92 * float(spec["dist_mult"])
+		var cam_pos := Vector3(rel.x * dist, h * rel.y, rel.z * dist)
+
+		(st["key"] as DirectionalLight3D).look_at_from_position(
+			Vector3(-dist * 1.2, h * 1.4, -dist * 1.4),
+			look_target,
+			Vector3.UP
+		)
+		(st["cool_rim"] as DirectionalLight3D).look_at_from_position(
+			Vector3(dist * 1.2, h * 1.2, dist * 1.3),
+			look_target,
+			Vector3.UP
+		)
+		(st["accent_rim"] as OmniLight3D).position = Vector3(-dist * 0.75, h * 0.85, dist * 0.65)
+		(st["accent_rim"] as OmniLight3D).omni_range = maxf(6.5, h * 3.0)
+		cam.look_at_from_position(cam_pos, look_target, Vector3.UP)
+
 	st["id"] = str(spec["id"])
 	return st
 
@@ -730,7 +1048,7 @@ func _build_forged_cuirass() -> Node3D:
 		tasset.material_override = plate_mat
 		root_armor.add_child(tasset)
 
-	var pauldron_mesh := load("res://assets/models/gear/pauldron_ancient.res") as Mesh
+	var pauldron_mesh: Mesh = load("res://assets/models/gear/pauldron_ancient.res") as Mesh if ResourceLoader.exists("res://assets/models/gear/pauldron_ancient.res") else null
 	if pauldron_mesh != null:
 		var p_box := pauldron_mesh.get_aabb()
 		var p_max := maxf(0.001, maxf(p_box.size.x, maxf(p_box.size.y, p_box.size.z)))

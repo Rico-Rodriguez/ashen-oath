@@ -5,17 +5,18 @@
 
 [sub_resource type="Environment" id="Environment_sanctuary"]
 background_mode = 1
-background_color = Color(0.047, 0.055, 0.075, 1)
+background_color = Color(0.032, 0.038, 0.052, 1)
 ambient_light_source = 2
-ambient_light_color = Color(0.22, 0.25, 0.34, 1)
-ambient_light_energy = 1.05
+ambient_light_color = Color(0.28, 0.32, 0.42, 1)
+ambient_light_energy = 0.92
 tonemap_mode = 3
 glow_enabled = true
-glow_intensity = 0.55
-glow_bloom = 0.12
+glow_intensity = 0.52
+glow_bloom = 0.10
+glow_hdr_threshold = 1.15
 fog_enabled = true
-fog_light_color = Color(0.07, 0.085, 0.12, 1)
-fog_density = 0.025
+fog_light_color = Color(0.055, 0.068, 0.095, 1)
+fog_density = 0.042
 
 [node name="SanctuaryStage3D" type="PanelContainer"]
 clip_contents = true
@@ -65,20 +66,12 @@ light_energy = 1.45
 [node name="StageRoot" type="Node3D" parent="ViewportStack/SubViewportContainer/SubViewport"]
 
 [node name="TurntablePivot" type="Node3D" parent="ViewportStack/SubViewportContainer/SubViewport/StageRoot"]
-
-[node name="BrazierRoot" type="Node3D" parent="ViewportStack/SubViewportContainer/SubViewport/StageRoot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, -1.28, -0.2, 0.45)
-
-[node name="BrazierLight" type="OmniLight3D" parent="ViewportStack/SubViewportContainer/SubViewport/StageRoot/BrazierRoot"]
-transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 1.15, -0.1)
-light_color = Color(1, 0.56, 0.18, 1)
-light_energy = 2.35
-omni_range = 6.2
+transform = Transform3D(1, 0, 0, 0, 1, 0, 0, 0, 1, 0, 0.28, 0)
 
 [node name="StageCamera" type="Camera3D" parent="ViewportStack/SubViewportContainer/SubViewport"]
-transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.48, -3.65)
+transform = Transform3D(-1, 0, -8.74228e-08, 0, 1, 0, 8.74228e-08, 0, -1, 0, 1.62, -4.65)
 current = true
-fov = 33.0
+fov = 34.0
 
 [node name="RotateHint" type="Label" parent="ViewportStack"]
 layout_mode = 1

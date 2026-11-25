@@ -70,15 +70,7 @@ func _build_class_pills() -> void:
 	for ch in class_row.get_children():
 		ch.queue_free()
 	_class_btns.clear()
-
-	for hdef in GameRegistry.get_all_classes():
-		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 38)
-		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.text = hdef.display_name.to_upper()
-		btn.pressed.connect(_on_class_pill_pressed.bind(hdef.class_id))
-		class_row.add_child(btn)
-		_class_btns[hdef.class_id] = btn
+	class_row.visible = false
 
 
 func _build_stat_cells() -> void:
@@ -196,11 +188,10 @@ func refresh_ui() -> void:
 	if gs == null:
 		return
 
-	var cid := str(gs.get("selected_class_id"))
+	var cid := "oathbreaker"
 	var hdef := GameRegistry.get_class_def(cid)
 	if hdef == null:
-		hdef = GameRegistry.get_class_def("oathbreaker")
-		cid = "oathbreaker"
+		return
 
 	for k in _class_btns:
 		UiThemeBuilder.style_tab_button(_class_btns[k] as Button, str(k) == cid, 12)
@@ -452,8 +443,7 @@ func _on_socket_pressed(slot: GameEnums.Slot) -> void:
 		ad.call("sfx", "ui_tap")
 	var gs := _game_state()
 	if gs != null and gs.has_method("get_equipped_item"):
-		var cid := str(gs.get("selected_class_id"))
-		var eq_it: EquipmentItem = gs.call("get_equipped_item", cid, slot)
+		var eq_it: EquipmentItem = gs.call("get_equipped_item", "oathbreaker", slot)
 		if eq_it != null:
 			_selected_uid = eq_it.uid
 	refresh_ui()
@@ -463,7 +453,7 @@ func _on_equip_pressed() -> void:
 	var gs := _game_state()
 	if gs == null or _selected_uid == "":
 		return
-	var cid := str(gs.get("selected_class_id"))
+	var cid := "oathbreaker"
 	if bool(gs.call("equip_item", cid, _selected_uid)):
 		var ad := _audio()
 		if ad != null:

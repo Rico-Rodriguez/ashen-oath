@@ -3,6 +3,9 @@ extends Node3D
 
 signal shrine_triggered(choices: Array[ShrineBlessingDef])
 
+const SHRINE_GLB_PATH := "res://assets/models/kit/kit_dark_shrine.glb"
+const ENERGY_SHADER_PATH := "res://shaders/vfx_energy.gdshader"
+
 var director: Node = null
 var rng: RandomNumberGenerator = RandomNumberGenerator.new()
 var trigger_radius: float = 2.8
@@ -11,9 +14,12 @@ var is_consumed: bool = false
 var offered_choices: Array[ShrineBlessingDef] = []
 
 var _crystal_pivot: Node3D = null
-var _rune_mat: StandardMaterial3D = null
+var _crystal_base_y: float = 0.0
+var _crystal_mats: Array[StandardMaterial3D] = []
+var _ring_shader_mat: ShaderMaterial = null
 var _shrine_light: OmniLight3D = null
 var _pulse_time: float = 0.0
+var _built_visuals: bool = false
 
 
 func _ready() -> void:
@@ -34,11 +40,11 @@ func setup(p_director: Node, p_pos: Vector3, p_rng: RandomNumberGenerator = null
 
 func _physics_process(delta: float) -> void:
 	_pulse_time += delta
-	if _crystal_pivot != null:
-		_crystal_pivot.position.y = 2.35 + sin(_pulse_time * 2.4) * 0.10
-		_crystal_pivot.rotation.y = wrapf(_crystal_pivot.rotation.y + 1.15 * delta, -PI, PI)
+	if _crystal_pivot != null and is_instance_valid(_crystal_pivot):
+		_crystal_pivot.position.y = _crystal_base_y + sin(_pulse_time * 2.4) * 0.08
+		_crystal_pivot.rotation.y = wrapf(_crystal_pivot.rotation.y + 1.05 * delta, -PI, PI)
 	if _shrine_light != null and not is_consumed:
-		_shrine_light.light_energy = 2.2 + sin(_pulse_time * 3.1) * 0.35
+		_shrine_light.light_energy = 2.1 + sin(_pulse_time * 3.1) * 0.30
 
 	if is_consumed or is_offering:
 		return
@@ -68,80 +74,83 @@ func _trigger_offer(hero: Node3D) -> void:
 func mark_consumed() -> void:
 	is_consumed = true
 	is_offering = false
-	if _rune_mat != null:
-		_rune_mat.albedo_color = Color(0.95, 0.68, 0.28, 1.0)
-		_rune_mat.emission = Color(0.95, 0.56, 0.18, 1.0)
-		_rune_mat.emission_energy_multiplier = 1.1
+	if _ring_shader_mat != null:
+		_ring_shader_mat.set_shader_parameter("energy_color", Color(0.92, 0.62, 0.24, 1.0))
+		_ring_shader_mat.set_shader_parameter("hdr_gain", 0.65)
+		_ring_shader_mat.set_shader_parameter("fade_alpha", 0.45)
+	for cm in _crystal_mats:
+		if cm != null:
+			cm.albedo_color = Color(0.95, 0.68, 0.28, 1.0)
+			cm.emission = Color(0.95, 0.56, 0.18, 1.0)
+			cm.emission_energy_multiplier = 0.85
 	if _shrine_light != null:
 		_shrine_light.light_color = Color(0.96, 0.64, 0.24, 1.0)
 		_shrine_light.light_energy = 0.85
 
 
 func _build_shrine_geometry() -> void:
-	if _crystal_pivot != null:
+	if _built_visuals:
+		return
+	_built_visuals = true
+	if DisplayServer.get_name() == "headless":
 		return
 
-	var stone_mat := StandardMaterial3D.new()
-	stone_mat.albedo_color = Color(0.16, 0.17, 0.20, 1.0)
-	stone_mat.roughness = 0.86
-	stone_mat.metallic = 0.12
+	var shrine_ps := load(SHRINE_GLB_PATH) as PackedScene
+	if shrine_ps != null:
+		var inst := shrine_ps.instantiate() as Node3D
+		inst.name = "DarkShrineModel"
+		inst.scale = Vector3.ONE * 1.10
+		add_child(inst)
+		var crystal := inst.find_child("ShrineCrystal", true, false) as Node3D
+		if crystal != null:
+			_crystal_pivot = crystal
+			_crystal_base_y = crystal.position.y
+			for n in crystal.find_children("*", "MeshInstance3D", true, false):
+				var mi := n as MeshInstance3D
+				if mi.mesh == null:
+					continue
+				for s in mi.mesh.get_surface_count():
+					var mat := mi.get_active_material(s)
+					if mat is StandardMaterial3D and (mat as StandardMaterial3D).emission_enabled:
+						var dup := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+						dup.emission_energy_multiplier = 1.35
+						mi.set_surface_override_material(s, dup)
+						_crystal_mats.append(dup)
+			if crystal is MeshInstance3D:
+				var cmi := crystal as MeshInstance3D
+				if cmi.mesh != null:
+					for s in cmi.mesh.get_surface_count():
+						var mat := cmi.get_active_material(s)
+						if mat is StandardMaterial3D and (mat as StandardMaterial3D).emission_enabled:
+							var dup := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+							dup.emission_energy_multiplier = 1.35
+							cmi.set_surface_override_material(s, dup)
+							_crystal_mats.append(dup)
 
-	var plinth := MeshInstance3D.new()
-	var plinth_mesh := CylinderMesh.new()
-	plinth_mesh.top_radius = 1.15
-	plinth_mesh.bottom_radius = 1.40
-	plinth_mesh.height = 0.36
-	plinth_mesh.radial_segments = 8
-	plinth.mesh = plinth_mesh
-	plinth.position = Vector3(0.0, 0.18, 0.0)
-	plinth.material_override = stone_mat
-	add_child(plinth)
-
-	var obelisk := MeshInstance3D.new()
-	var ob_mesh := CylinderMesh.new()
-	ob_mesh.top_radius = 0.32
-	ob_mesh.bottom_radius = 0.52
-	ob_mesh.height = 1.75
-	ob_mesh.radial_segments = 6
-	obelisk.mesh = ob_mesh
-	obelisk.position = Vector3(0.0, 1.18, 0.0)
-	obelisk.material_override = stone_mat
-	add_child(obelisk)
-
-	_rune_mat = StandardMaterial3D.new()
-	_rune_mat.albedo_color = Color(0.36, 0.78, 1.0, 1.0)
-	_rune_mat.roughness = 0.20
-	_rune_mat.emission_enabled = true
-	_rune_mat.emission = Color(0.28, 0.68, 1.0, 1.0)
-	_rune_mat.emission_energy_multiplier = 3.4
-
-	var band := MeshInstance3D.new()
-	var band_mesh := TorusMesh.new()
-	band_mesh.inner_radius = 0.44
-	band_mesh.outer_radius = 0.52
-	band_mesh.rings = 12
-	band_mesh.ring_segments = 8
-	band.mesh = band_mesh
-	band.position = Vector3(0.0, 1.35, 0.0)
-	band.material_override = _rune_mat
-	add_child(band)
-
-	_crystal_pivot = Node3D.new()
-	_crystal_pivot.position = Vector3(0.0, 2.35, 0.0)
-	add_child(_crystal_pivot)
-
-	var crystal := MeshInstance3D.new()
-	var c_mesh := PrismMesh.new()
-	c_mesh.size = Vector3(0.42, 0.62, 0.42)
-	crystal.mesh = c_mesh
-	crystal.material_override = _rune_mat
-	_crystal_pivot.add_child(crystal)
+	var energy_sh := load(ENERGY_SHADER_PATH) as Shader
+	if energy_sh != null:
+		_ring_shader_mat = ShaderMaterial.new()
+		_ring_shader_mat.shader = energy_sh
+		_ring_shader_mat.set_shader_parameter("beam_mode", 1)
+		_ring_shader_mat.set_shader_parameter("energy_color", Color(0.28, 0.68, 1.0, 1.0))
+		_ring_shader_mat.set_shader_parameter("hdr_gain", 1.28)
+		_ring_shader_mat.set_shader_parameter("fade_alpha", 0.78)
+		var ring_mi := MeshInstance3D.new()
+		ring_mi.name = "EtchedRuneRing"
+		var rpm := PlaneMesh.new()
+		rpm.size = Vector2(4.6, 4.6)
+		ring_mi.mesh = rpm
+		ring_mi.position = Vector3(0.0, 0.032, 0.0)
+		ring_mi.material_override = _ring_shader_mat
+		ring_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		add_child(ring_mi)
 
 	_shrine_light = OmniLight3D.new()
-	_shrine_light.light_color = Color(0.34, 0.74, 1.0, 1.0)
-	_shrine_light.omni_range = 6.5
-	_shrine_light.light_energy = 2.2
-	_shrine_light.position = Vector3(0.0, 2.25, 0.0)
+	_shrine_light.light_color = Color(0.32, 0.74, 1.0, 1.0)
+	_shrine_light.omni_range = 6.8
+	_shrine_light.light_energy = 2.1
+	_shrine_light.position = Vector3(0.0, 2.95, 0.0)
+	_shrine_light.shadow_enabled = false
 	add_child(_shrine_light)
 
 

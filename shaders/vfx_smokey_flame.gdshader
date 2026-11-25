@@ -77,7 +77,8 @@ void fragment() {
 
 	float shape = (1.0 - dist) + (turb - 0.48) * 0.86 + (wisps - 0.5) * 0.30;
 	float erode = mix(0.10, 0.62, v_life);
-	float alpha_mask = smoothstep(erode, erode + 0.24, shape);
+	float uv_edge = smoothstep(0.0, 0.14, UV.x) * smoothstep(1.0, 0.86, UV.x) * smoothstep(0.0, 0.10, UV.y) * smoothstep(1.0, 0.84, UV.y);
+	float alpha_mask = smoothstep(erode, erode + 0.24, shape) * uv_edge;
 
 	float soot_zone = clamp(height_01 * 0.62 + v_life * 0.65 + soot_dominance * 0.72 + (1.0 - turb) * 0.22, 0.0, 1.0);
 	float center_boost = (1.0 - smoothstep(0.05, 0.38, abs(centered.x * pinch))) * (1.0 - height_01 * 0.55) * (1.0 - soot_dominance);

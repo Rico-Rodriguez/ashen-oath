@@ -141,14 +141,21 @@ static func _build_classes() -> void:
 		"Iron Tempest",
 		"Whirling dragging blade storm throwing sparks across nearby foes.",
 		7.0, 2.1, 3.6, 3.6, 1.6,
-		"iron_tempest", "blades", "skill_whirl"
+		"iron_tempest", "blades", "attack_whirl"
 	)
 	oath.skill_2 = _make_ability(
-		"bulwark_charge",
-		"Bulwark Charge",
-		"Armored dash-slam that shatters enemy ranks with a shockwave.",
-		9.0, 2.6, 3.2, 6.5, 0.45,
-		"bulwark_charge", "charge_land", "skill_slam"
+		"blackflame_pyre",
+		"Blackflame Wave",
+		"Crushing overhead slam erupting a smokey blackflame pillar and shockwave.",
+		8.5, 2.5, 3.5, 8.5, 1.8,
+		"blackflame_pyre", "meteor", "skill_slam"
+	)
+	oath.skill_3 = _make_ability(
+		"stormbrand_arc",
+		"Stormbrand",
+		"Raised gauntlet calling down 45 Hz jagged chain lightning across foes.",
+		8.0, 2.2, 5.0, 9.0, 0.35,
+		"stormbrand_arc", "thunder", "skill_cast", 4
 	)
 	oath.dash_ability = _make_ability(
 		"iron_roll",
@@ -279,12 +286,12 @@ static func _register_enemy(
 
 
 static func _build_enemies() -> void:
-	_register_enemy("hollow_ghoul", "Hollow Ghoul", "Risen Grave-Feeder", false, GameEnums.EnemyArchetype.SWARMER, 58.0, 4.4, 12.0, 1.65, 0.35, 0.45, 1.0, 10, 4)
-	_register_enemy("crypt_batlord", "Crypt Batlord", "Bloodwing Screecher", false, GameEnums.EnemyArchetype.RANGED, 48.0, 4.1, 14.0, 7.2, 0.45, 0.65, 1.05, 13, 6)
+	_register_enemy("hollow_ghoul", "Ashen Thrall", "Risen Oath-Sworn", false, GameEnums.EnemyArchetype.SWARMER, 58.0, 4.4, 12.0, 1.65, 0.35, 0.45, 1.0, 10, 4)
+	_register_enemy("crypt_batlord", "Cinder Acolyte", "Blackflame Cultist", false, GameEnums.EnemyArchetype.RANGED, 48.0, 4.1, 14.0, 7.2, 0.45, 0.65, 1.05, 13, 6)
 	_register_enemy("ash_scorpion", "Ash Scorpion", "Cinderback Skitterer", false, GameEnums.EnemyArchetype.CHARGER, 82.0, 5.2, 18.0, 2.2, 0.42, 0.55, 1.15, 16, 8)
-	_register_enemy("stone_gargoyle", "Stone Gargoyle", "Carved Bastion Sentinel", false, GameEnums.EnemyArchetype.BRUISER, 145.0, 3.2, 24.0, 2.4, 0.58, 0.72, 1.35, 24, 12)
+	_register_enemy("stone_gargoyle", "Barrow Halberdier", "Cathedral Sentinel", false, GameEnums.EnemyArchetype.BRUISER, 145.0, 3.2, 24.0, 2.4, 0.58, 0.72, 1.35, 24, 12)
 
-	_register_enemy("barrow_troll", "Gravemaw, Barrow Troll", "Warden of the Fringe", true, GameEnums.EnemyArchetype.BOSS, 920.0, 3.4, 34.0, 3.2, 0.72, 0.85, 2.1, 140, 65)
+	_register_enemy("barrow_troll", "Vaelor, The Ashen Warden", "Lord of the Ashen Nave", true, GameEnums.EnemyArchetype.BOSS, 920.0, 3.4, 34.0, 3.2, 0.72, 0.85, 2.1, 140, 65)
 	_register_enemy("blight_werewolf", "Nightmaw, Blight Stalker", "Terror of the Weald", true, GameEnums.EnemyArchetype.BOSS, 1480.0, 4.8, 44.0, 2.9, 0.52, 0.68, 1.95, 210, 105)
 	_register_enemy("dread_golem", "Obsidian Warden", "Sentinel of the Catacombs", true, GameEnums.EnemyArchetype.BOSS, 2350.0, 3.1, 58.0, 3.5, 0.80, 0.90, 2.35, 310, 160)
 	_register_enemy("infernal_minotaur", "Khorvath, Ashen Bull", "Sovereign of the Rift", true, GameEnums.EnemyArchetype.BOSS, 3400.0, 4.3, 74.0, 3.6, 0.64, 0.76, 2.5, 450, 240)

@@ -191,65 +191,165 @@ func _sweep_hero(prev_pos: Vector3, next_pos: Vector3) -> void:
 
 
 func _build_visual() -> void:
-	if visual_style in ["blackflame_bolt", "voidpyre_bolt"] and vfx != null and vfx.has_method("spawn_blackflame_bolt_vfx"):
-		vfx.call("spawn_blackflame_bolt_vfx", self)
-
-	var mi := MeshInstance3D.new()
-	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-	var mat := StandardMaterial3D.new()
-	mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
-	mat.emission_enabled = true
-
 	match visual_style:
 		"wraith_lance":
 			hit_radius = 0.52
-			var lance := CylinderMesh.new()
-			lance.top_radius = 0.02
-			lance.bottom_radius = 0.11
-			lance.height = 1.45
-			lance.radial_segments = 6
-			mi.mesh = lance
-			mi.rotation_degrees.x = 90.0
-			mat.albedo_color = Color(0.95, 0.24, 0.36, 0.92)
-			mat.emission = Color(1.0, 0.18, 0.32, 1.0)
-			mat.emission_energy_multiplier = 3.2
 		"blood_orb":
-			hit_radius = 0.44
-			var orb := SphereMesh.new()
-			orb.radius = 0.22
-			orb.height = 0.44
-			orb.radial_segments = 10
-			orb.rings = 6
-			mi.mesh = orb
-			mat.albedo_color = Color(0.88, 0.10, 0.18, 1.0)
-			mat.emission = Color(0.96, 0.12, 0.22, 1.0)
-			mat.emission_energy_multiplier = 2.8
+			hit_radius = 0.46
 		"boss_ember":
 			hit_radius = 0.50
-			var ember := SphereMesh.new()
-			ember.radius = 0.26
-			ember.height = 0.52
-			ember.radial_segments = 10
-			ember.rings = 6
-			mi.mesh = ember
-			mat.albedo_color = Color(1.0, 0.42, 0.10, 1.0)
-			mat.emission = Color(1.0, 0.32, 0.06, 1.0)
-			mat.emission_energy_multiplier = 3.4
 		_:
-			hit_radius = 0.46
-			var core := SphereMesh.new()
-			core.radius = 0.19
-			core.height = 0.38
-			core.radial_segments = 10
-			core.rings = 6
-			mi.mesh = core
-			var is_void := visual_style == "voidpyre_bolt"
-			mat.albedo_color = Color(0.62, 0.24, 0.96, 1.0) if is_void else Color(1.0, 0.56, 0.18, 1.0)
-			mat.emission = mat.albedo_color
-			mat.emission_energy_multiplier = 3.0
+			hit_radius = 0.48
 
-	mi.material_override = mat
-	add_child(mi)
+	if DisplayServer.get_name() == "headless":
+		return
+
+	if visual_style == "wraith_lance":
+		_build_energy_shard_visual(Color(0.96, 0.22, 0.36, 1.0))
+	elif visual_style == "voidpyre_bolt":
+		_build_flame_bolt_visual(Vector3(3.8, 1.1, 5.4), Vector3(1.5, 0.30, 2.4), Color(0.62, 0.34, 1.0), 0.52)
+	elif visual_style == "blood_orb":
+		_build_flame_bolt_visual(Vector3(4.6, 0.52, 0.72), Vector3(2.0, 0.14, 0.24), Color(0.95, 0.16, 0.28), 0.54)
+	else:
+		_build_flame_bolt_visual(Vector3(5.2, 2.2, 0.48), Vector3(2.3, 0.48, 0.09), Color(1.0, 0.48, 0.14), 0.56)
+
+
+func _build_flame_bolt_visual(core_hdr: Vector3, mid_flame: Vector3, light_col: Color, soot: float) -> void:
+	var holder := Node3D.new()
+	holder.name = "VolumetricBoltVfx"
+	add_child(holder)
+
+	var flame_sh := load("res://shaders/vfx_smokey_flame.gdshader") as Shader
+	if flame_sh != null:
+		var tail_mat := ShaderMaterial.new()
+		tail_mat.shader = flame_sh
+		tail_mat.set_shader_parameter("billboard_mode", false)
+		tail_mat.set_shader_parameter("soot_dominance", soot)
+		tail_mat.set_shader_parameter("core_hdr", core_hdr)
+		tail_mat.set_shader_parameter("mid_flame", mid_flame)
+		tail_mat.set_shader_parameter("scroll_speed", 4.8)
+		tail_mat.set_shader_parameter("noise_scale", 5.2)
+
+		var tail_q := QuadMesh.new()
+		tail_q.size = Vector2(0.54, 1.32)
+		for z_deg in [0.0, 90.0]:
+			var tmi := MeshInstance3D.new()
+			tmi.mesh = tail_q
+			tmi.rotation_degrees = Vector3(90.0, 0.0, z_deg)
+			tmi.position = Vector3(0.0, 0.0, 0.22)
+			tmi.material_override = tail_mat
+			tmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			holder.add_child(tmi)
+
+		var head_mat := ShaderMaterial.new()
+		head_mat.shader = flame_sh
+		head_mat.render_priority = 1
+		head_mat.set_shader_parameter("billboard_mode", true)
+		head_mat.set_shader_parameter("soot_dominance", maxf(0.18, soot - 0.22))
+		head_mat.set_shader_parameter("core_hdr", core_hdr * 1.15)
+		head_mat.set_shader_parameter("mid_flame", mid_flame)
+		head_mat.set_shader_parameter("scroll_speed", 4.4)
+		var hq := QuadMesh.new()
+		hq.size = Vector2(0.70, 0.84)
+		var hmi := MeshInstance3D.new()
+		hmi.mesh = hq
+		hmi.position = Vector3(0.0, 0.0, -0.14)
+		hmi.material_override = head_mat
+		hmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(hmi)
+
+	_attach_bolt_trail_sparks(holder, light_col)
+
+	var light := OmniLight3D.new()
+	light.light_color = light_col
+	light.light_energy = 1.45
+	light.omni_range = 3.4
+	light.shadow_enabled = false
+	holder.add_child(light)
+
+
+func _build_energy_shard_visual(energy_col: Color) -> void:
+	var holder := Node3D.new()
+	holder.name = "EnergyShardVfx"
+	add_child(holder)
+
+	var energy_sh := load("res://shaders/vfx_energy.gdshader") as Shader
+	var shard_mat: Material
+	if energy_sh != null:
+		var sm := ShaderMaterial.new()
+		sm.shader = energy_sh
+		sm.set_shader_parameter("beam_mode", 0)
+		sm.set_shader_parameter("energy_color", energy_col)
+		sm.set_shader_parameter("hdr_gain", 2.65)
+		shard_mat = sm
+	else:
+		var std := StandardMaterial3D.new()
+		std.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+		std.albedo_color = energy_col * 2.2
+		shard_mat = std
+
+	var lance := CylinderMesh.new()
+	lance.top_radius = 0.0
+	lance.bottom_radius = 0.12
+	lance.height = 1.38
+	lance.radial_segments = 4
+	var mi := MeshInstance3D.new()
+	mi.mesh = lance
+	mi.rotation_degrees.x = -90.0
+	mi.material_override = shard_mat
+	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	holder.add_child(mi)
+
+	_attach_bolt_trail_sparks(holder, energy_col)
+
+	var light := OmniLight3D.new()
+	light.light_color = energy_col
+	light.light_energy = 1.35
+	light.omni_range = 3.0
+	light.shadow_enabled = false
+	holder.add_child(light)
+
+
+func _attach_bolt_trail_sparks(holder: Node3D, col: Color) -> void:
+	var proc := ParticleProcessMaterial.new()
+	proc.particle_flag_align_y = true
+	proc.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+	proc.emission_sphere_radius = 0.08
+	proc.direction = Vector3(0.0, 0.35, 1.0).normalized()
+	proc.spread = 32.0
+	proc.initial_velocity_min = 1.4
+	proc.initial_velocity_max = 3.2
+	proc.gravity = Vector3(0.0, -2.5, 0.0)
+	proc.scale_min = 0.65
+	proc.scale_max = 1.25
+
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.5, 1.0])
+	grad.colors = PackedColorArray([
+		Color(1.0, 0.96, 0.88, 1.0),
+		Color(col.r, col.g, col.b, 0.90),
+		Color(col.r * 0.3, col.g * 0.2, col.b * 0.15, 0.0),
+	])
+	var gtex := GradientTexture1D.new()
+	gtex.gradient = grad
+	proc.color_ramp = gtex
+
+	var spark_mesh := BladeScrapeVfx.make_crossed_spark_mesh(0.055, 0.24)
+	var spark_sh := load("res://shaders/vfx_spark.gdshader") as Shader
+	if spark_sh != null:
+		var sm := ShaderMaterial.new()
+		sm.shader = spark_sh
+		sm.render_priority = 2
+		sm.set_shader_parameter("spark_hdr", Vector4(col.r * 4.2, col.g * 3.8, col.b * 3.2, 1.0))
+		spark_mesh.surface_set_material(0, sm)
+
+	var gp := GPUParticles3D.new()
+	gp.amount = 16
+	gp.lifetime = 0.30
+	gp.local_coords = false
+	gp.process_material = proc
+	gp.draw_pass_1 = spark_mesh
+	holder.add_child(gp)
 
 
 func _expire() -> void:

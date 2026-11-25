@@ -24,13 +24,13 @@ void fragment() {
 	} else {
 		vec2 p = (UV - 0.5) * 2.0;
 		float r = length(p);
-		float ring = exp(-pow((r - 0.82) / 0.11, 2.0));
-		float inner = exp(-pow((r - 0.56) / 0.06, 2.0)) * 0.45;
-		float ang = atan(p.y, p.x) + TIME * 1.6;
-		float runes = smoothstep(0.75, 0.95, abs(sin(ang * 6.0))) * step(0.58, r) * step(r, 0.80) * 0.45;
-		float intensity = clamp(ring + inner + runes, 0.0, 1.0) * (1.0 - smoothstep(0.94, 1.0, r)) * fade_alpha;
-		vec3 col = mix(energy_color.rgb, vec3(1.0, 0.95, 0.85), ring * 0.4) * (hdr_gain * intensity);
+		float ring = exp(-pow((r - 0.84) / 0.034, 2.0));
+		float inner = exp(-pow((r - 0.58) / 0.022, 2.0)) * 0.55;
+		float ang = atan(p.y, p.x) + TIME * 1.1;
+		float runes = smoothstep(0.82, 0.96, abs(sin(ang * 8.0))) * step(0.62, r) * step(r, 0.80) * 0.48;
+		float intensity = clamp(ring + inner + runes, 0.0, 1.0) * (1.0 - smoothstep(0.92, 1.0, r)) * fade_alpha;
+		vec3 col = mix(energy_color.rgb, vec3(0.88, 0.94, 1.0), ring * 0.25) * (hdr_gain * intensity);
 		ALBEDO = col;
-		ALPHA = clamp(intensity, 0.0, 1.0);
+		ALPHA = clamp(intensity * 0.92, 0.0, 0.92);
 	}
 }

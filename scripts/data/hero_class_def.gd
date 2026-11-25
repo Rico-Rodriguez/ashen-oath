@@ -16,6 +16,7 @@ extends Resource
 @export var starter_lantern: GameEnums.LanternAspect = GameEnums.LanternAspect.EMBER_GOLD
 @export var skill_1: AbilityDef
 @export var skill_2: AbilityDef
+@export var skill_3: AbilityDef
 @export var dash_ability: AbilityDef
 
 

@@ -37,13 +37,36 @@ var _cloth_shaders: Array[ShaderMaterial] = []
 var _move_blend: float = 0.0
 var _current_logical_anim: String = ""
 var _drag_pose_weight: float = 0.0
+var _enrage_light: OmniLight3D = null
+var _enrage_particles: GPUParticles3D = null
 
 const LOOPING_CLIPS := {
 	"idle": true,
 	"run": true,
 	"walk": true,
+	"attack_whirl": true,
+	"skill_whirl": true,
 	"Fly Forward In Place": true,
 	"walkForward": true,
+}
+
+const UNIFIED_KIT_CLIP_MAP := {
+	"idle": "idle",
+	"run": "run",
+	"walk": "run",
+	"attack": "attack_1",
+	"attack_1": "attack_1",
+	"attack2": "attack_2",
+	"attack_2": "attack_2",
+	"attack_whirl": "attack_whirl",
+	"skill_whirl": "attack_whirl",
+	"skill_slam": "skill_slam",
+	"skill_cast": "skill_cast",
+	"skill_arc": "skill_cast",
+	"windup": "skill_cast",
+	"dash": "dash",
+	"hit": "hit",
+	"death": "death",
 }
 
 const RIG_CLIP_MAP := {
@@ -192,9 +215,17 @@ func _process(delta: float) -> void:
 	_apply_hit_flash_level(ratio)
 
 
-func register_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Array[ShaderMaterial]) -> void:
+func is_unified_kit() -> bool:
+	return skeleton != null and skeleton.find_bone("weapon_r") >= 0
+
+
+func register_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Array[ShaderMaterial], std_mats: Array[StandardMaterial3D] = []) -> void:
 	_flash_shaders.clear()
 	_cloth_shaders.clear()
+	_flash_std_mats.clear()
+	_flash_std_base_emit.clear()
+	_flash_std_base_energy.clear()
+	_flash_std_had_emit.clear()
 	for m in armor_mats:
 		if m != null and not _flash_shaders.has(m):
 			_flash_shaders.append(m)
@@ -205,6 +236,73 @@ func register_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Ar
 			if not _flash_shaders.has(cm):
 				_flash_shaders.append(cm)
 			cm.set_shader_parameter("move_speed_norm", _move_blend)
+	for sm in std_mats:
+		if sm != null and not _flash_std_mats.has(sm):
+			_flash_std_mats.append(sm)
+			_flash_std_had_emit.append(sm.emission_enabled)
+			_flash_std_base_emit.append(sm.emission)
+			_flash_std_base_energy.append(sm.emission_energy_multiplier)
+
+
+func set_enrage_embers(active: bool) -> void:
+	ensure_initialized()
+	for i in _flash_std_mats.size():
+		var m := _flash_std_mats[i]
+		if m == null:
+			continue
+		if m.resource_name == "EmissiveCinder" or _flash_std_had_emit[i]:
+			var e_col := Color(1.0, 0.34, 0.08) if active else Color(0.92, 0.28, 0.06)
+			var e_pow := 3.6 if active else 1.5
+			m.emission_enabled = true
+			m.emission = e_col
+			m.emission_energy_multiplier = e_pow
+			_flash_std_had_emit[i] = true
+			_flash_std_base_emit[i] = e_col
+			_flash_std_base_energy[i] = e_pow
+
+	if active:
+		if _enrage_light == null or not is_instance_valid(_enrage_light):
+			_enrage_light = OmniLight3D.new()
+			_enrage_light.name = "EnrageEmberLight"
+			_enrage_light.light_color = Color(1.0, 0.36, 0.10)
+			_enrage_light.light_energy = 2.6
+			_enrage_light.omni_range = 5.5
+			_enrage_light.shadow_enabled = false
+			_enrage_light.position = Vector3(0.0, height_meters * 0.58, 0.2)
+			add_child(_enrage_light)
+		_enrage_light.visible = true
+		if DisplayServer.get_name() != "headless" and (_enrage_particles == null or not is_instance_valid(_enrage_particles)):
+			var proc := ParticleProcessMaterial.new()
+			proc.particle_flag_align_y = true
+			proc.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_SPHERE
+			proc.emission_sphere_radius = 0.72
+			proc.direction = Vector3.UP
+			proc.spread = 32.0
+			proc.initial_velocity_min = 1.6
+			proc.initial_velocity_max = 3.8
+			proc.gravity = Vector3(0.0, 1.4, 0.0)
+			var spark_mesh := BladeScrapeVfx.make_crossed_spark_mesh(0.075, 0.26)
+			var spark_sh := load("res://shaders/vfx_spark.gdshader") as Shader
+			if spark_sh != null:
+				var sm := ShaderMaterial.new()
+				sm.shader = spark_sh
+				sm.set_shader_parameter("spark_hdr", Vector4(5.4, 1.75, 0.30, 0.95))
+				spark_mesh.surface_set_material(0, sm)
+			_enrage_particles = GPUParticles3D.new()
+			_enrage_particles.name = "EnrageEmbers"
+			_enrage_particles.position = Vector3(0.0, height_meters * 0.48, 0.0)
+			_enrage_particles.amount = 36
+			_enrage_particles.lifetime = 0.85
+			_enrage_particles.process_material = proc
+			_enrage_particles.draw_pass_1 = spark_mesh
+			add_child(_enrage_particles)
+		if _enrage_particles != null:
+			_enrage_particles.emitting = true
+	else:
+		if _enrage_light != null and is_instance_valid(_enrage_light):
+			_enrage_light.visible = false
+		if _enrage_particles != null and is_instance_valid(_enrage_particles):
+			_enrage_particles.emitting = false
 
 
 func play_anim(logical_name: String, speed_scale: float = 1.0, force_restart: bool = false) -> void:
@@ -442,6 +540,25 @@ func _configure_enemy_materials() -> void:
 	_flash_std_base_energy.clear()
 	_flash_std_had_emit.clear()
 
+	if is_unified_kit():
+		for n in model_instance.find_children("*", "MeshInstance3D", true, false):
+			var mi := n as MeshInstance3D
+			if not mi.visible or mi.mesh == null:
+				continue
+			for s in mi.mesh.get_surface_count():
+				var active := mi.get_active_material(s)
+				var sm: StandardMaterial3D
+				if active is StandardMaterial3D:
+					sm = (active as StandardMaterial3D).duplicate() as StandardMaterial3D
+				else:
+					sm = StandardMaterial3D.new()
+				mi.set_surface_override_material(s, sm)
+				_flash_std_mats.append(sm)
+				_flash_std_had_emit.append(sm.emission_enabled)
+				_flash_std_base_emit.append(sm.emission)
+				_flash_std_base_energy.append(sm.emission_energy_multiplier)
+		return
+
 	var troll_veins := {}
 	if actor_id == "barrow_troll":
 		troll_veins = {
@@ -545,7 +662,7 @@ func _apply_hit_flash_level(level: float) -> void:
 func _resolve_clip_name(logical_name: String) -> String:
 	if anim_player == null:
 		return ""
-	var map: Dictionary = RIG_CLIP_MAP.get(actor_id, DEFAULT_HUMANOID_MAP)
+	var map: Dictionary = UNIFIED_KIT_CLIP_MAP if is_unified_kit() else RIG_CLIP_MAP.get(actor_id, DEFAULT_HUMANOID_MAP)
 	var candidate: String = str(map.get(logical_name, logical_name))
 	if anim_player.has_animation(candidate):
 		return candidate

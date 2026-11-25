@@ -1,14 +1,13 @@
 class_name SanctuaryStage3D
 extends PanelContainer
 
-@export var camera_distance: float = 3.65
-@export var camera_height: float = 1.48
-@export var look_height: float = 1.04
+@export var camera_distance: float = 4.65
+@export var camera_height: float = 1.62
+@export var look_height: float = 1.24
 
 @onready var viewport_container: SubViewportContainer = $ViewportStack/SubViewportContainer
 @onready var sub_viewport: SubViewport = $ViewportStack/SubViewportContainer/SubViewport
 @onready var turntable_pivot: Node3D = $ViewportStack/SubViewportContainer/SubViewport/StageRoot/TurntablePivot
-@onready var brazier_light: OmniLight3D = $ViewportStack/SubViewportContainer/SubViewport/StageRoot/BrazierRoot/BrazierLight
 @onready var stage_camera: Camera3D = $ViewportStack/SubViewportContainer/SubViewport/StageCamera
 
 var _hero_visual: ActorVisual = null
@@ -19,6 +18,7 @@ var _dragging: bool = false
 var _last_drag_x: float = 0.0
 var _flicker_time: float = 0.0
 var _built_props: bool = false
+var _brazier_lights: Array[OmniLight3D] = []
 
 
 func _ready() -> void:
@@ -54,8 +54,11 @@ func _process(delta: float) -> void:
 	if not is_visible_in_tree():
 		return
 	_flicker_time += delta
-	if brazier_light != null:
-		brazier_light.light_energy = 2.35 + sin(_flicker_time * 7.3) * 0.24 + cos(_flicker_time * 13.1) * 0.14
+	for i in range(_brazier_lights.size()):
+		var bl := _brazier_lights[i]
+		if bl != null and is_instance_valid(bl):
+			var phase := float(i) * 2.1
+			bl.light_energy = 2.45 + sin(_flicker_time * 7.3 + phase) * 0.24 + cos(_flicker_time * 13.1 + phase) * 0.14
 	if not _dragging:
 		_target_yaw += delta * 0.14
 	_current_yaw = lerp_angle(_current_yaw, _target_yaw, 1.0 - exp(-12.0 * delta))
@@ -95,11 +98,10 @@ func refresh_hero() -> void:
 	if turntable_pivot == null:
 		return
 	var gs := _game_state()
-	var cid := str(gs.get("selected_class_id")) if gs != null else "oathbreaker"
+	var cid := "oathbreaker"
 	var hdef := GameRegistry.get_class_def(cid)
 	if hdef == null:
-		hdef = GameRegistry.get_class_def("oathbreaker")
-		cid = "oathbreaker"
+		return
 
 	if _hero_visual == null or not is_instance_valid(_hero_visual) or _loaded_class_id != cid:
 		if _hero_visual != null and is_instance_valid(_hero_visual):
@@ -138,12 +140,25 @@ func refresh_hero() -> void:
 		cstats.lantern_color
 	)
 	_hero_visual.play_anim("idle", 1.0, false)
+	_center_hero_on_plinth()
+
+
+func _center_hero_on_plinth() -> void:
+	if _hero_visual == null or _hero_visual.skeleton == null:
+		return
+	_hero_visual.position = Vector3.ZERO
+	var hips_idx := _hero_visual.skeleton.find_bone("hips")
+	if hips_idx < 0:
+		return
+	var hips_pose := _hero_visual.skeleton.get_bone_global_pose(hips_idx).origin
+	var local_hips := _hero_visual.transform.affine_inverse() * (_hero_visual.model_pivot.transform * _hero_visual.model_instance.transform * _hero_visual.skeleton.transform * hips_pose)
+	_hero_visual.position = Vector3(-local_hips.x, 0.0, -local_hips.z)
 
 
 func _configure_camera() -> void:
 	if stage_camera == null:
 		return
-	stage_camera.fov = 33.0
+	stage_camera.fov = 34.0
 	stage_camera.look_at_from_position(
 		Vector3(0.0, camera_height, -camera_distance),
 		Vector3(0.0, look_height, 0.0),
@@ -155,122 +170,113 @@ func _build_sanctuary_props() -> void:
 	if _built_props or sub_viewport == null:
 		return
 	_built_props = true
+	_brazier_lights.clear()
 	var stage_root := sub_viewport.get_node_or_null("StageRoot") as Node3D
 	if stage_root == null:
 		return
 
-	var stone_dark := StandardMaterial3D.new()
-	stone_dark.albedo_color = Color(0.11, 0.12, 0.15)
-	stone_dark.roughness = 0.86
-	stone_dark.metallic = 0.08
+	turntable_pivot.position = Vector3(0.0, 0.33, 0.0)
 
-	var stone_step := StandardMaterial3D.new()
-	stone_step.albedo_color = Color(0.15, 0.16, 0.20)
-	stone_step.roughness = 0.78
-	stone_step.metallic = 0.12
+	var ground_sh := load("res://shaders/vfx_barrow_ground.gdshader") as Shader
+	if ground_sh != null:
+		var gmat := ShaderMaterial.new()
+		gmat.shader = ground_sh
+		gmat.set_shader_parameter("ground_tint", Color(0.24, 0.25, 0.28, 1.0))
+		var tex_map := {
+			"forest_albedo": "res://assets/textures/ground_forest_color.jpg",
+			"forest_normal": "res://assets/textures/ground_forest_normal.jpg",
+			"dirt_albedo": "res://assets/textures/ground_dirt_color.jpg",
+			"dirt_normal": "res://assets/textures/ground_dirt_normal.jpg",
+			"stone_albedo": "res://assets/textures/rock_color.jpg",
+			"stone_normal": "res://assets/textures/rock_normal.jpg",
+		}
+		for param in tex_map:
+			var tex := load(str(tex_map[param])) as Texture2D
+			if tex != null:
+				gmat.set_shader_parameter(param, tex)
+		var floor_mi := MeshInstance3D.new()
+		floor_mi.name = "CathedralFloor"
+		var pm := PlaneMesh.new()
+		pm.size = Vector2(28.0, 28.0)
+		pm.subdivide_width = 12
+		pm.subdivide_depth = 12
+		floor_mi.mesh = pm
+		floor_mi.position = Vector3(0.0, 0.0, 2.0)
+		floor_mi.material_override = gmat
+		stage_root.add_child(floor_mi)
 
-	var bronze_trim := StandardMaterial3D.new()
-	bronze_trim.albedo_color = Color(0.58, 0.45, 0.24)
-	bronze_trim.metallic = 0.85
-	bronze_trim.roughness = 0.30
+	var plinth_ps := load("res://assets/models/kit/kit_sanctum_plinth.glb") as PackedScene
+	if plinth_ps != null:
+		var plinth := plinth_ps.instantiate() as Node3D
+		plinth.name = "SanctumPlinth"
+		plinth.position = Vector3.ZERO
+		stage_root.add_child(plinth)
 
-	var floor_slab := MeshInstance3D.new()
-	var fcyl := CylinderMesh.new()
-	fcyl.top_radius = 4.6
-	fcyl.bottom_radius = 4.8
-	fcyl.height = 0.12
-	fcyl.radial_segments = 32
-	floor_slab.mesh = fcyl
-	floor_slab.position = Vector3(0.0, -0.26, 0.0)
-	floor_slab.material_override = stone_dark
-	stage_root.add_child(floor_slab)
-
-	var lower_plinth := MeshInstance3D.new()
-	var lcyl := CylinderMesh.new()
-	lcyl.top_radius = 1.42
-	lcyl.bottom_radius = 1.56
-	lcyl.height = 0.14
-	lcyl.radial_segments = 24
-	lower_plinth.mesh = lcyl
-	lower_plinth.position = Vector3(0.0, -0.15, 0.0)
-	lower_plinth.material_override = stone_dark
-	stage_root.add_child(lower_plinth)
-
-	var upper_plinth := MeshInstance3D.new()
-	var ucyl := CylinderMesh.new()
-	ucyl.top_radius = 1.15
-	ucyl.bottom_radius = 1.24
-	ucyl.height = 0.10
-	ucyl.radial_segments = 24
-	upper_plinth.mesh = ucyl
-	upper_plinth.position = Vector3(0.0, -0.05, 0.0)
-	upper_plinth.material_override = stone_step
-	stage_root.add_child(upper_plinth)
-
-	var rune_ring := MeshInstance3D.new()
-	var rtor := TorusMesh.new()
-	rtor.inner_radius = 1.11
-	rtor.outer_radius = 1.16
-	rune_ring.mesh = rtor
-	rune_ring.scale = Vector3(1.0, 0.35, 1.0)
-	rune_ring.position = Vector3(0.0, -0.005, 0.0)
-	rune_ring.material_override = bronze_trim
-	stage_root.add_child(rune_ring)
+	var brazier_ps := load("res://assets/models/kit/kit_wrought_brazier.glb") as PackedScene
+	var flame_sh := load("res://shaders/vfx_smokey_flame.gdshader") as Shader
+	var flame_quad := QuadMesh.new()
+	flame_quad.size = Vector2(0.56, 0.84)
+	var flame_mat: ShaderMaterial = null
+	if flame_sh != null:
+		flame_mat = ShaderMaterial.new()
+		flame_mat.shader = flame_sh
+		flame_mat.set_shader_parameter("billboard_mode", true)
+		flame_mat.set_shader_parameter("soot_dominance", 0.38)
+		flame_mat.set_shader_parameter("core_hdr", Vector3(5.6, 2.5, 0.52))
+		flame_mat.set_shader_parameter("mid_flame", Vector3(2.2, 0.48, 0.08))
+		flame_mat.set_shader_parameter("scroll_speed", 2.8)
 
 	for side in [-1.0, 1.0]:
-		var pillar := MeshInstance3D.new()
-		var pbox := CylinderMesh.new()
-		pbox.top_radius = 0.24
-		pbox.bottom_radius = 0.28
-		pbox.height = 3.8
-		pbox.radial_segments = 12
-		pillar.mesh = pbox
-		pillar.position = Vector3(side * 2.15, 1.65, 2.35)
-		pillar.material_override = stone_dark
-		stage_root.add_child(pillar)
+		var b_node := Node3D.new()
+		b_node.name = "SanctumBrazierL" if side < 0.0 else "SanctumBrazierR"
+		b_node.position = Vector3(side * 1.56, 0.0, 1.48)
+		b_node.rotation.y = side * -0.45
+		stage_root.add_child(b_node)
+		if brazier_ps != null:
+			var b_inst := brazier_ps.instantiate() as Node3D
+			b_inst.scale = Vector3.ONE * 0.94
+			b_node.add_child(b_inst)
+		if flame_mat != null:
+			var f_mi := MeshInstance3D.new()
+			f_mi.mesh = flame_quad
+			f_mi.position = Vector3(0.0, 1.54, 0.0)
+			f_mi.material_override = flame_mat
+			f_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+			b_node.add_child(f_mi)
+		var blight := OmniLight3D.new()
+		blight.position = Vector3(0.0, 1.84, -0.10)
+		blight.light_color = Color(1.0, 0.56, 0.18)
+		blight.light_energy = 2.45
+		blight.omni_range = 6.8
+		blight.shadow_enabled = false
+		b_node.add_child(blight)
+		_brazier_lights.append(blight)
 
-	var brazier_root := stage_root.get_node_or_null("BrazierRoot") as Node3D
-	if brazier_root != null:
-		var iron_mat := StandardMaterial3D.new()
-		iron_mat.albedo_color = Color(0.14, 0.14, 0.16)
-		iron_mat.metallic = 0.82
-		iron_mat.roughness = 0.40
+	var arch_ps := load("res://assets/models/kit/kit_gothic_arch.glb") as PackedScene
+	if arch_ps != null:
+		var arch := arch_ps.instantiate() as Node3D
+		arch.name = "CathedralArch"
+		arch.position = Vector3(0.0, 0.0, 4.15)
+		arch.scale = Vector3.ONE * 0.56
+		stage_root.add_child(arch)
 
-		var stand := MeshInstance3D.new()
-		var scyl := CylinderMesh.new()
-		scyl.top_radius = 0.10
-		scyl.bottom_radius = 0.22
-		scyl.height = 0.78
-		scyl.radial_segments = 12
-		stand.mesh = scyl
-		stand.position = Vector3(0.0, 0.38, 0.0)
-		stand.material_override = iron_mat
-		brazier_root.add_child(stand)
+	var pillar_ps := load("res://assets/models/kit/kit_gothic_pillar.glb") as PackedScene
+	if pillar_ps != null:
+		for side in [-1.0, 1.0]:
+			var pil := pillar_ps.instantiate() as Node3D
+			pil.name = "CathedralPillarL" if side < 0.0 else "CathedralPillarR"
+			pil.position = Vector3(side * 2.65, 0.0, 2.75)
+			pil.scale = Vector3.ONE * 0.62
+			stage_root.add_child(pil)
 
-		var bowl := MeshInstance3D.new()
-		var bcyl := CylinderMesh.new()
-		bcyl.top_radius = 0.30
-		bcyl.bottom_radius = 0.14
-		bcyl.height = 0.22
-		bcyl.radial_segments = 16
-		bowl.mesh = bcyl
-		bowl.position = Vector3(0.0, 0.82, 0.0)
-		bowl.material_override = iron_mat
-		brazier_root.add_child(bowl)
-
-		var coals := MeshInstance3D.new()
-		var csph := SphereMesh.new()
-		csph.radius = 0.23
-		csph.height = 0.18
-		coals.mesh = csph
-		coals.position = Vector3(0.0, 0.92, 0.0)
-		var coal_mat := StandardMaterial3D.new()
-		coal_mat.albedo_color = Color(1.0, 0.52, 0.14)
-		coal_mat.emission_enabled = true
-		coal_mat.emission = Color(1.0, 0.42, 0.08)
-		coal_mat.emission_energy_multiplier = 3.6
-		coals.material_override = coal_mat
-		brazier_root.add_child(coals)
+	var rim_back := OmniLight3D.new()
+	rim_back.name = "CathedralBackRim"
+	rim_back.position = Vector3(0.0, 3.1, 5.2)
+	rim_back.light_color = Color(0.36, 0.50, 0.84)
+	rim_back.light_energy = 2.35
+	rim_back.omni_range = 10.5
+	rim_back.shadow_enabled = false
+	stage_root.add_child(rim_back)
 
 
 func _game_state() -> Node:

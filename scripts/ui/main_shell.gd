@@ -50,12 +50,18 @@ func _ready() -> void:
 	hunt_tab.embark_requested.connect(start_expedition)
 
 	var gs := _game_state()
-	if gs != null and not gs.profile_changed.is_connected(refresh_header):
-		gs.profile_changed.connect(refresh_header)
+	if gs != null:
+		if str(gs.get("selected_class_id")) != "oathbreaker":
+			gs.call("select_class", "oathbreaker")
+		if not gs.profile_changed.is_connected(refresh_header):
+			gs.profile_changed.connect(refresh_header)
 
 	var ad := _audio()
 	if ad != null:
 		ad.call("music", "home")
+
+	resized.connect(_apply_safe_margins)
+	_apply_safe_margins()
 
 	switch_tab(Tab.SANCTUM)
 	refresh_header()
@@ -66,8 +72,7 @@ func _exit_tree() -> void:
 
 
 func _style_shell_chrome() -> void:
-	header_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8))
-	nav_panel.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8))
+	_apply_safe_margins()
 
 	power_pill.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_BRONZE, 1, 4, 8, 4))
 	gold_pill.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_SLATE, 1, 4, 8, 4))
@@ -86,6 +91,28 @@ func _style_shell_chrome() -> void:
 	else:
 		settings_btn.text = "CFG"
 	UiThemeBuilder.style_tab_button(settings_btn, false, 12)
+
+
+func _apply_safe_margins() -> void:
+	var m := UiThemeBuilder.get_safe_margins(self)
+	var top_pad := int(m["top"])
+	var bot_pad := int(m["bottom"])
+	var left_pad := int(m["left"])
+	var right_pad := int(m["right"])
+
+	var h_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8)
+	h_box.content_margin_top = 8.0 + float(top_pad)
+	h_box.content_margin_left = 12.0 + float(left_pad)
+	h_box.content_margin_right = 12.0 + float(right_pad)
+	header_panel.add_theme_stylebox_override("panel", h_box)
+	header_panel.custom_minimum_size.y = 58.0 + float(top_pad)
+
+	var n_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8)
+	n_box.content_margin_bottom = 8.0 + float(bot_pad)
+	n_box.content_margin_left = 12.0 + float(left_pad)
+	n_box.content_margin_right = 12.0 + float(right_pad)
+	nav_panel.add_theme_stylebox_override("panel", n_box)
+	nav_panel.custom_minimum_size.y = 68.0 + float(bot_pad)
 
 
 func switch_tab(tab: Tab) -> void:

@@ -235,11 +235,10 @@ vertical_alignment = 1
 
 [node name="ThumbstickZone" type="Control" parent="Root"]
 layout_mode = 1
-anchors_preset = 2
-anchor_top = 1.0
+anchors_preset = -1
+anchor_top = 0.45
+anchor_right = 0.58
 anchor_bottom = 1.0
-offset_top = -500.0
-offset_right = 370.0
 grow_vertical = 0
 script = ExtResource("2")
 
@@ -250,17 +249,18 @@ anchor_left = 1.0
 anchor_top = 1.0
 anchor_right = 1.0
 anchor_bottom = 1.0
-offset_left = -338.0
-offset_top = -132.0
+offset_left = -306.0
+offset_top = -294.0
 offset_right = -14.0
-offset_bottom = -20.0
+offset_bottom = -18.0
 grow_horizontal = 0
 grow_vertical = 0
+mouse_filter = 2
 
-[node name="ActionRow" type="HBoxContainer" parent="Root/ActionDeckMargin"]
+[node name="ActionCluster" type="Control" parent="Root/ActionDeckMargin"]
+custom_minimum_size = Vector2(292, 276)
 layout_mode = 2
-alignment = 2
-theme_override_constants/separation = 10
+mouse_filter = 2
 
 [node name="ShrineModal" type="ColorRect" parent="Root"]
 visible = false
