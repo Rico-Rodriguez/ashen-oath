@@ -1,0 +1,467 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/combat_hud.gd" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/virtual_thumbstick.gd" id="2"]
+
+[node name="CombatHud" type="CanvasLayer"]
+layer = 10
+script = ExtResource("1")
+
+[node name="Root" type="Control" parent="."]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="FloatersLayer" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+
+[node name="TopMargin" type="MarginContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 220.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 10
+theme_override_constants/margin_top = 10
+theme_override_constants/margin_right = 10
+
+[node name="TopVBox" type="VBoxContainer" parent="Root/TopMargin"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 6
+
+[node name="TopBarPanel" type="PanelContainer" parent="Root/TopMargin/TopVBox"]
+layout_mode = 2
+
+[node name="TopRow" type="HBoxContainer" parent="Root/TopMargin/TopVBox/TopBarPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PortraitFrame" type="PanelContainer" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow"]
+custom_minimum_size = Vector2(60, 60)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="HeroPortraitTex" type="TextureRect" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/PortraitFrame"]
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="VitalsVBox" type="VBoxContainer" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 4
+
+[node name="HeroTitleRow" type="HBoxContainer" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox"]
+layout_mode = 2
+
+[node name="HeroTitleLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/HeroTitleRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "OATHBREAKER KNIGHT"
+
+[node name="BlessingLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/HeroTitleRow"]
+layout_mode = 2
+text = "Shrines: 0"
+
+[node name="HpBarWrap" type="Control" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+
+[node name="HpBar" type="ProgressBar" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/HpBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+value = 100.0
+show_percentage = false
+
+[node name="HpLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/HpBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "260 / 260 HP"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="WardBarWrap" type="Control" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox"]
+custom_minimum_size = Vector2(0, 14)
+layout_mode = 2
+
+[node name="WardBar" type="ProgressBar" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/WardBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+show_percentage = false
+
+[node name="WardLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/VitalsVBox/WardBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+text = "WARD 0"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="LootPanel" type="PanelContainer" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow"]
+custom_minimum_size = Vector2(106, 0)
+layout_mode = 2
+
+[node name="LootVBox" type="VBoxContainer" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/LootPanel"]
+layout_mode = 2
+alignment = 1
+theme_override_constants/separation = 2
+
+[node name="GoldLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/LootPanel/LootVBox"]
+layout_mode = 2
+text = "Gold: 0"
+
+[node name="RelicsLbl" type="Label" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow/LootPanel/LootVBox"]
+layout_mode = 2
+text = "Relics: 0"
+
+[node name="PauseBtn" type="Button" parent="Root/TopMargin/TopVBox/TopBarPanel/TopRow"]
+custom_minimum_size = Vector2(48, 56)
+layout_mode = 2
+text = "II"
+
+[node name="ObjectiveCenter" type="CenterContainer" parent="Root/TopMargin/TopVBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ObjectivePanel" type="PanelContainer" parent="Root/TopMargin/TopVBox/ObjectiveCenter"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="ObjectiveLbl" type="Label" parent="Root/TopMargin/TopVBox/ObjectiveCenter/ObjectivePanel"]
+layout_mode = 2
+mouse_filter = 2
+text = "CLEARING 1 / 3"
+horizontal_alignment = 1
+
+[node name="BossPanel" type="PanelContainer" parent="Root/TopMargin/TopVBox"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BossRow" type="HBoxContainer" parent="Root/TopMargin/TopVBox/BossPanel"]
+layout_mode = 2
+mouse_filter = 2
+theme_override_constants/separation = 10
+
+[node name="BossPortraitFrame" type="PanelContainer" parent="Root/TopMargin/TopVBox/BossPanel/BossRow"]
+custom_minimum_size = Vector2(56, 56)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BossPortraitTex" type="TextureRect" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossPortraitFrame"]
+layout_mode = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 6
+
+[node name="BossVBox" type="VBoxContainer" parent="Root/TopMargin/TopVBox/BossPanel/BossRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+mouse_filter = 2
+theme_override_constants/separation = 4
+
+[node name="BossHeaderRow" type="HBoxContainer" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox"]
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BossNameLbl" type="Label" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox/BossHeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+mouse_filter = 2
+text = "Gravemaw, Barrow Troll"
+
+[node name="BossEnragedLbl" type="Label" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox/BossHeaderRow"]
+visible = false
+layout_mode = 2
+mouse_filter = 2
+text = "[ENRAGED]"
+
+[node name="BossBarWrap" type="Control" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox"]
+custom_minimum_size = Vector2(0, 22)
+layout_mode = 2
+mouse_filter = 2
+
+[node name="BossHpBar" type="ProgressBar" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox/BossBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+value = 100.0
+show_percentage = false
+
+[node name="BossHpLbl" type="Label" parent="Root/TopMargin/TopVBox/BossPanel/BossRow/BossVBox/BossBarWrap"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+text = "920 / 920"
+horizontal_alignment = 1
+vertical_alignment = 1
+
+[node name="ThumbstickZone" type="Control" parent="Root"]
+layout_mode = 1
+anchors_preset = 2
+anchor_top = 1.0
+anchor_bottom = 1.0
+offset_top = -500.0
+offset_right = 370.0
+grow_vertical = 0
+script = ExtResource("2")
+
+[node name="ActionDeckMargin" type="MarginContainer" parent="Root"]
+layout_mode = 1
+anchors_preset = 3
+anchor_left = 1.0
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_left = -338.0
+offset_top = -132.0
+offset_right = -14.0
+offset_bottom = -20.0
+grow_horizontal = 0
+grow_vertical = 0
+
+[node name="ActionRow" type="HBoxContainer" parent="Root/ActionDeckMargin"]
+layout_mode = 2
+alignment = 2
+theme_override_constants/separation = 10
+
+[node name="ShrineModal" type="ColorRect" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.02, 0.035, 0.8)
+
+[node name="Center" type="CenterContainer" parent="Root/ShrineModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="ShrinePanel" type="PanelContainer" parent="Root/ShrineModal/Center"]
+custom_minimum_size = Vector2(640, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Root/ShrineModal/Center/ShrinePanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="ShrineTitleLbl" type="Label" parent="Root/ShrineModal/Center/ShrinePanel/VBox"]
+layout_mode = 2
+text = "DARK SHRINE OF ASHEN OATHS"
+horizontal_alignment = 1
+
+[node name="ShrineSubLbl" type="Label" parent="Root/ShrineModal/Center/ShrinePanel/VBox"]
+layout_mode = 2
+text = "Swear one covenant to empower this expedition and restore 25% Max HP."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="ShrineChoicesBox" type="VBoxContainer" parent="Root/ShrineModal/Center/ShrinePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="PauseModal" type="ColorRect" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.025, 0.035, 0.84)
+
+[node name="Center" type="CenterContainer" parent="Root/PauseModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="PausePanel" type="PanelContainer" parent="Root/PauseModal/Center"]
+custom_minimum_size = Vector2(560, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Root/PauseModal/Center/PausePanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="PauseTitleLbl" type="Label" parent="Root/PauseModal/Center/PausePanel/VBox"]
+layout_mode = 2
+text = "EXPEDITION PAUSED"
+horizontal_alignment = 1
+
+[node name="MusicRow" type="HBoxContainer" parent="Root/PauseModal/Center/PausePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="MusicLbl" type="Label" parent="Root/PauseModal/Center/PausePanel/VBox/MusicRow"]
+custom_minimum_size = Vector2(115, 0)
+layout_mode = 2
+text = "Music Volume"
+
+[node name="MusicSlider" type="HSlider" parent="Root/PauseModal/Center/PausePanel/VBox/MusicRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.8
+
+[node name="MusicVal" type="Label" parent="Root/PauseModal/Center/PausePanel/VBox/MusicRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "80%"
+horizontal_alignment = 2
+
+[node name="SfxRow" type="HBoxContainer" parent="Root/PauseModal/Center/PausePanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SfxLbl" type="Label" parent="Root/PauseModal/Center/PausePanel/VBox/SfxRow"]
+custom_minimum_size = Vector2(115, 0)
+layout_mode = 2
+text = "SFX Volume"
+
+[node name="SfxSlider" type="HSlider" parent="Root/PauseModal/Center/PausePanel/VBox/SfxRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 4
+max_value = 1.0
+step = 0.05
+value = 0.9
+
+[node name="SfxVal" type="Label" parent="Root/PauseModal/Center/PausePanel/VBox/SfxRow"]
+custom_minimum_size = Vector2(50, 0)
+layout_mode = 2
+text = "90%"
+horizontal_alignment = 2
+
+[node name="ShakeToggle" type="CheckButton" parent="Root/PauseModal/Center/PausePanel/VBox"]
+layout_mode = 2
+button_pressed = true
+text = "Impact Screen Shake"
+
+[node name="LeftyToggle" type="CheckButton" parent="Root/PauseModal/Center/PausePanel/VBox"]
+layout_mode = 2
+text = "Left-Handed Combat HUD"
+
+[node name="ResumeBtn" type="Button" parent="Root/PauseModal/Center/PausePanel/VBox"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+text = "RESUME HUNT"
+
+[node name="RetreatBtn" type="Button" parent="Root/PauseModal/Center/PausePanel/VBox"]
+custom_minimum_size = Vector2(0, 46)
+layout_mode = 2
+text = "RETREAT TO SANCTUM"
+
+[node name="SummaryModal" type="ColorRect" parent="Root"]
+visible = false
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.02, 0.022, 0.032, 0.86)
+
+[node name="Center" type="CenterContainer" parent="Root/SummaryModal"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="SummaryPanel" type="PanelContainer" parent="Root/SummaryModal/Center"]
+custom_minimum_size = Vector2(648, 0)
+layout_mode = 2
+
+[node name="VBox" type="VBoxContainer" parent="Root/SummaryModal/Center/SummaryPanel"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SummaryBannerLbl" type="Label" parent="Root/SummaryModal/Center/SummaryPanel/VBox"]
+layout_mode = 2
+text = "GUARDIAN SLAIN — BARROW PURGED"
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="SummaryStatsLbl" type="Label" parent="Root/SummaryModal/Center/SummaryPanel/VBox"]
+layout_mode = 2
+text = "Barrow Fringe (Normal) · Time 00:45"
+horizontal_alignment = 1
+
+[node name="SummaryLootHeader" type="Label" parent="Root/SummaryModal/Center/SummaryPanel/VBox"]
+layout_mode = 2
+text = "RECOVERED RELICS"
+
+[node name="SummaryScroll" type="ScrollContainer" parent="Root/SummaryModal/Center/SummaryPanel/VBox"]
+custom_minimum_size = Vector2(0, 320)
+layout_mode = 2
+horizontal_scroll_mode = 0
+
+[node name="SummaryLootList" type="VBoxContainer" parent="Root/SummaryModal/Center/SummaryPanel/VBox/SummaryScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 8
+
+[node name="SummaryBtns" type="HBoxContainer" parent="Root/SummaryModal/Center/SummaryPanel/VBox"]
+layout_mode = 2
+theme_override_constants/separation = 12
+
+[node name="SanctumBtn" type="Button" parent="Root/SummaryModal/Center/SummaryPanel/VBox/SummaryBtns"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "RETURN TO SANCTUM"
+
+[node name="HuntAgainBtn" type="Button" parent="Root/SummaryModal/Center/SummaryPanel/VBox/SummaryBtns"]
+custom_minimum_size = Vector2(0, 56)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "HUNT AGAIN"

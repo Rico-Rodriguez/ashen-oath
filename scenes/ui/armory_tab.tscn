@@ -1,0 +1,173 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/ui/armory_tab.gd" id="1"]
+[ext_resource type="PackedScene" path="res://scenes/ui/sanctuary_stage_3d.tscn" id="2"]
+
+[node name="ArmoryTab" type="MarginContainer"]
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+size_flags_horizontal = 3
+size_flags_vertical = 3
+theme_override_constants/margin_left = 12
+theme_override_constants/margin_top = 8
+theme_override_constants/margin_right = 12
+theme_override_constants/margin_bottom = 8
+script = ExtResource("1")
+
+[node name="VBox" type="VBoxContainer" parent="."]
+layout_mode = 2
+theme_override_constants/separation = 7
+
+[node name="ClassRow" type="HBoxContainer" parent="VBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="StatPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+
+[node name="StatRow" type="HBoxContainer" parent="VBox/StatPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="PaperDollRow" type="HBoxContainer" parent="VBox"]
+custom_minimum_size = Vector2(0, 310)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="LeftSockets" type="VBoxContainer" parent="VBox/PaperDollRow"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="SanctuaryStage3D" parent="VBox/PaperDollRow" instance=ExtResource("2")]
+layout_mode = 2
+camera_distance = 3.55
+camera_height = 1.44
+look_height = 1.02
+
+[node name="RightSockets" type="VBoxContainer" parent="VBox/PaperDollRow"]
+custom_minimum_size = Vector2(126, 0)
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="InspectorPanel" type="PanelContainer" parent="VBox"]
+custom_minimum_size = Vector2(0, 212)
+layout_mode = 2
+
+[node name="InspVBox" type="VBoxContainer" parent="VBox/InspectorPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="HeaderRow" type="HBoxContainer" parent="VBox/InspectorPanel/InspVBox"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="IconFrame" type="PanelContainer" parent="VBox/InspectorPanel/InspVBox/HeaderRow"]
+custom_minimum_size = Vector2(54, 54)
+layout_mode = 2
+
+[node name="IconTex" type="TextureRect" parent="VBox/InspectorPanel/InspVBox/HeaderRow/IconFrame"]
+layout_mode = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="TitleVBox" type="VBoxContainer" parent="VBox/InspectorPanel/InspVBox/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+alignment = 1
+theme_override_constants/separation = 1
+
+[node name="InspNameLbl" type="Label" parent="VBox/InspectorPanel/InspVBox/HeaderRow/TitleVBox"]
+layout_mode = 2
+text = "Iron Zweihander"
+
+[node name="InspMetaLbl" type="Label" parent="VBox/InspectorPanel/InspVBox/HeaderRow/TitleVBox"]
+layout_mode = 2
+text = "Common · Tier 1 Greatsword · PWR 35"
+
+[node name="InspBadgeLbl" type="Label" parent="VBox/InspectorPanel/InspVBox/HeaderRow"]
+layout_mode = 2
+text = "[EQUIPPED]"
+
+[node name="DetailsRow" type="HBoxContainer" parent="VBox/InspectorPanel/InspVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+theme_override_constants/separation = 12
+
+[node name="InspStatsLbl" type="Label" parent="VBox/InspectorPanel/InspVBox/DetailsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+size_flags_vertical = 1
+text = "34 ATK · 0.86s Swing"
+autowrap_mode = 3
+
+[node name="InspDeltaLbl" type="Label" parent="VBox/InspectorPanel/InspVBox/DetailsRow"]
+custom_minimum_size = Vector2(185, 0)
+layout_mode = 2
+size_flags_vertical = 1
+text = "Active Relic"
+horizontal_alignment = 2
+autowrap_mode = 3
+
+[node name="ActionsRow" type="HBoxContainer" parent="VBox/InspectorPanel/InspVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="EquipBtn" type="Button" parent="VBox/InspectorPanel/InspVBox/ActionsRow"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "EQUIP"
+
+[node name="TemperBtn" type="Button" parent="VBox/InspectorPanel/InspVBox/ActionsRow"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "TEMPER"
+
+[node name="SalvageBtn" type="Button" parent="VBox/InspectorPanel/InspVBox/ActionsRow"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "SALVAGE"
+
+[node name="SalvageCommonsBtn" type="Button" parent="VBox/InspectorPanel/InspVBox/ActionsRow"]
+custom_minimum_size = Vector2(0, 40)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "SALVAGE COMMON"
+
+[node name="BagPanel" type="PanelContainer" parent="VBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="BagVBox" type="VBoxContainer" parent="VBox/BagPanel"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="BagHeaderRow" type="HBoxContainer" parent="VBox/BagPanel/BagVBox"]
+layout_mode = 2
+
+[node name="BagHeaderLbl" type="Label" parent="VBox/BagPanel/BagVBox/BagHeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "OWNED RELICS"
+
+[node name="BagHintLbl" type="Label" parent="VBox/BagPanel/BagVBox/BagHeaderRow"]
+layout_mode = 2
+text = "Tap any relic or socket to inspect"
+
+[node name="BagScroll" type="ScrollContainer" parent="VBox/BagPanel/BagVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+horizontal_scroll_mode = 0
+
+[node name="BagGrid" type="GridContainer" parent="VBox/BagPanel/BagVBox/BagScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 5

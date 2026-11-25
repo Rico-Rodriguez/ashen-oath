@@ -1,0 +1,22 @@
+.godot/
+*.tmp
+*.blend
+*.blend1
+.DS_Store
+tools/__pycache__/
+android/
+*.import.bak
+agent-tools/
+build/
+captures/
+override.cfg
+_src/
+
+# local debug scratch
+dbg_*.gd
+dbg_*.gd.uid
+
+# local headless run logs
+out_*.txt
+err_*.txt
+shots*/

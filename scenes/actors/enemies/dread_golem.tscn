@@ -1,0 +1,18 @@
+[gd_scene load_steps=4 format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/models/sketchfab/mon/golem.glb" id="2"]
+[ext_resource type="Texture2D" path="res://assets/models/sketchfab/mon/golem_glow.png" id="3"]
+
+[node name="DreadGolem" type="Node3D"]
+script = ExtResource("1")
+actor_id = "dread_golem"
+height_meters = 2.3
+yaw_offset_deg = 180.0
+emission_override = ExtResource("3")
+emission_tint = Color(1, 0.52, 0.16, 1)
+emission_energy = 2.4
+
+[node name="ModelPivot" type="Node3D" parent="."]
+
+[node name="Model" parent="ModelPivot" instance=ExtResource("2")]

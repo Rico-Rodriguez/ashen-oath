@@ -1,0 +1,21 @@
+[gd_scene load_steps=3 format=3]
+
+[ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
+[ext_resource type="PackedScene" path="res://assets/models/heroes/plague/plague.tscn" id="2"]
+
+[node name="Battlemage" type="Node3D"]
+script = ExtResource("1")
+actor_id = "battlemage"
+is_hero = true
+hero_class_id = "battlemage"
+height_meters = 1.95
+yaw_offset_deg = 180.0
+armor_tier = 1
+weapon_key = "runed_staff"
+offhand_key = ""
+has_plume = false
+lantern_color = Color(0.26, 0.68, 1, 1)
+
+[node name="ModelPivot" type="Node3D" parent="."]
+
+[node name="Model" parent="ModelPivot" instance=ExtResource("2")]

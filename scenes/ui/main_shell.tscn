@@ -1,0 +1,130 @@
+[gd_scene load_steps=7 format=3]
+
+[ext_resource type="Theme" path="res://scenes/ui/dark_theme.tres" id="1"]
+[ext_resource type="Script" path="res://scripts/ui/main_shell.gd" id="2"]
+[ext_resource type="PackedScene" path="res://scenes/ui/hunt_tab.tscn" id="3"]
+[ext_resource type="PackedScene" path="res://scenes/ui/armory_tab.tscn" id="4"]
+[ext_resource type="PackedScene" path="res://scenes/ui/forge_tab.tscn" id="5"]
+[ext_resource type="PackedScene" path="res://scenes/ui/settings_modal.tscn" id="6"]
+
+[node name="MainShell" type="Control"]
+layout_mode = 3
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme = ExtResource("1")
+script = ExtResource("2")
+
+[node name="CombatWorldMount" type="Node" parent="."]
+
+[node name="HubLayer" type="Control" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+
+[node name="HubBg" type="ColorRect" parent="HubLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+color = Color(0.043, 0.051, 0.067, 1)
+
+[node name="HubVBox" type="VBoxContainer" parent="HubLayer"]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+theme_override_constants/separation = 0
+
+[node name="HeaderPanel" type="PanelContainer" parent="HubLayer/HubVBox"]
+custom_minimum_size = Vector2(0, 58)
+layout_mode = 2
+
+[node name="HeaderRow" type="HBoxContainer" parent="HubLayer/HubVBox/HeaderPanel"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="BrandLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ASHEN OATH"
+
+[node name="PowerPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+layout_mode = 2
+
+[node name="PowerLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/PowerPill"]
+layout_mode = 2
+text = "PWR 140"
+
+[node name="GoldPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+layout_mode = 2
+
+[node name="GoldLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/GoldPill"]
+layout_mode = 2
+text = "Gold 120"
+
+[node name="ScrapPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+layout_mode = 2
+
+[node name="ScrapLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/ScrapPill"]
+layout_mode = 2
+text = "Scrap 24"
+
+[node name="SettingsBtn" type="Button" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+custom_minimum_size = Vector2(40, 38)
+layout_mode = 2
+text = "CFG"
+
+[node name="TabStack" type="Control" parent="HubLayer/HubVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+
+[node name="HuntTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("3")]
+layout_mode = 1
+
+[node name="ArmoryTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("4")]
+visible = false
+layout_mode = 1
+
+[node name="ForgeTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("5")]
+visible = false
+layout_mode = 1
+
+[node name="NavDockPanel" type="PanelContainer" parent="HubLayer/HubVBox"]
+custom_minimum_size = Vector2(0, 68)
+layout_mode = 2
+
+[node name="NavRow" type="HBoxContainer" parent="HubLayer/HubVBox/NavDockPanel"]
+layout_mode = 2
+theme_override_constants/separation = 10
+
+[node name="NavSanctumBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "SANCTUM"
+
+[node name="NavArmoryBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "ARMORY"
+
+[node name="NavForgeBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 50)
+layout_mode = 2
+size_flags_horizontal = 3
+text = "FORGE & LORE"
+
+[node name="SettingsModal" parent="HubLayer" instance=ExtResource("6")]
+layout_mode = 1
