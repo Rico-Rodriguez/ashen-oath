@@ -12,6 +12,7 @@ var _mesh: ImmediateMesh
 var _mesh_inst: MeshInstance3D
 var _mat: ShaderMaterial
 var _samples: Array[Dictionary] = []
+var _dirty: bool = false
 
 
 func _ready() -> void:
@@ -66,12 +67,15 @@ func push_sample(base_world: Vector3, tip_world: Vector3, emitting: bool) -> voi
 	_samples.push_front({"base": base_world, "tip": tip_world, "age": 0.0})
 	while _samples.size() > MAX_SAMPLES:
 		_samples.pop_back()
-	if not _headless:
-		_rebuild_ribbon()
+	_dirty = true
 
 
 func _process(delta: float) -> void:
 	if _samples.is_empty():
+		if _dirty:
+			_dirty = false
+			if not _headless:
+				_rebuild_ribbon()
 		return
 	var i := _samples.size() - 1
 	while i >= 0:
@@ -81,6 +85,7 @@ func _process(delta: float) -> void:
 		else:
 			_samples[i]["age"] = a
 		i -= 1
+	_dirty = false
 	if not _headless:
 		_rebuild_ribbon()
 

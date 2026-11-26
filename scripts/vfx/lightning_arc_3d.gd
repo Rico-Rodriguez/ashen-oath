@@ -2,10 +2,11 @@ class_name LightningArc3D
 extends Node3D
 
 const DURATION := 0.28
-const REGEN_INTERVAL := 1.0 / 45.0
-const SUBDIV_DEPTH := 4
+const REGEN_INTERVAL := 1.0 / 22.0
+const SUBDIV_DEPTH := 3
 
 var chain_points: PackedVector3Array = PackedVector3Array()
+var enable_flash_light: bool = true
 
 var _headless: bool = false
 var _elapsed: float = 0.0
@@ -30,14 +31,15 @@ func _ready() -> void:
 	_headless = DisplayServer.get_name() == "headless"
 	_rng.randomize()
 
-	_flash_light = OmniLight3D.new()
-	_flash_light.name = "LightningFlash"
-	_flash_light.light_color = Color(0.52, 0.76, 1.0)
-	_flash_light.light_energy = 3.8
-	_flash_light.omni_range = 7.5
-	_flash_light.shadow_enabled = false
-	add_child(_flash_light)
-	_position_flash_light()
+	if enable_flash_light:
+		_flash_light = OmniLight3D.new()
+		_flash_light.name = "LightningFlash"
+		_flash_light.light_color = Color(0.52, 0.76, 1.0)
+		_flash_light.light_energy = 3.8
+		_flash_light.omni_range = 7.5
+		_flash_light.shadow_enabled = false
+		add_child(_flash_light)
+		_position_flash_light()
 
 	if _headless:
 		return
@@ -124,7 +126,7 @@ func _regenerate_bolts() -> void:
 				_rng.randf_range(-1.0, 1.0)
 			).normalized()
 			var fork_end := origin + (main_dir * 0.48 + fork_offset * 0.82).normalized() * (dist * _rng.randf_range(0.32, 0.58))
-			var branch_pts := _subdivide_segment(origin, fork_end, dist * 0.12, 3)
+			var branch_pts := _subdivide_segment(origin, fork_end, dist * 0.12, 2)
 			_emit_tapered_branch(branch_pts, 0.018, branch_col)
 	_mesh.surface_end()
 

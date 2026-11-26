@@ -3,6 +3,7 @@
 [ext_resource type="Script" path="res://scripts/ui/forge_tab.gd" id="1"]
 
 [node name="ForgeTab" type="MarginContainer"]
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -10,213 +11,198 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 8
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 8
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 96
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 104
 script = ExtResource("1")
 
 [node name="VBox" type="VBoxContainer" parent="."]
 layout_mode = 2
-theme_override_constants/separation = 10
+theme_override_constants/separation = 12
 
 [node name="ToggleRow" type="HBoxContainer" parent="VBox"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
 
 [node name="ForgeToggleBtn" type="Button" parent="VBox/ToggleRow"]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 size_flags_horizontal = 3
 text = "SOUL FORGE"
 
 [node name="BestiaryToggleBtn" type="Button" parent="VBox/ToggleRow"]
-custom_minimum_size = Vector2(0, 46)
+custom_minimum_size = Vector2(0, 64)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "BARROW BESTIARY"
+text = "BESTIARY"
 
-[node name="ForgeView" type="VBoxContainer" parent="VBox"]
+[node name="ForgeScroll" type="ScrollContainer" parent="VBox"]
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 10
+horizontal_scroll_mode = 0
 
-[node name="AnvilBanner" type="PanelContainer" parent="VBox/ForgeView"]
+[node name="ForgeView" type="VBoxContainer" parent="VBox/ForgeScroll"]
+layout_mode = 2
+size_flags_horizontal = 3
+theme_override_constants/separation = 12
+
+[node name="AnvilBanner" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 
-[node name="BannerVBox" type="VBoxContainer" parent="VBox/ForgeView/AnvilBanner"]
+[node name="BannerVBox" type="VBoxContainer" parent="VBox/ForgeScroll/ForgeView/AnvilBanner"]
 layout_mode = 2
-theme_override_constants/separation = 2
+theme_override_constants/separation = 3
 
-[node name="AnvilTitleLbl" type="Label" parent="VBox/ForgeView/AnvilBanner/BannerVBox"]
+[node name="AnvilTitleLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/AnvilBanner/BannerVBox"]
 layout_mode = 2
 text = "OBSIDIAN SOUL FORGE"
 
-[node name="AnvilSubLbl" type="Label" parent="VBox/ForgeView/AnvilBanner/BannerVBox"]
+[node name="AnvilSubLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/AnvilBanner/BannerVBox"]
 layout_mode = 2
 text = "Bind salvaged barrow-scrap and gold into targeted Rare, Epic, or Sovereign relics."
 autowrap_mode = 3
 
-[node name="SlotHeaderLbl" type="Label" parent="VBox/ForgeView"]
+[node name="SlotHeaderLbl" type="Label" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 text = "1. SELECT RELIC SLOT"
 
-[node name="SlotRow" type="HBoxContainer" parent="VBox/ForgeView"]
+[node name="SlotRow" type="HBoxContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="WeaponTypeBox" type="VBoxContainer" parent="VBox/ForgeView"]
+[node name="WeaponTypeBox" type="VBoxContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/separation = 8
 
-[node name="WTypeHeaderLbl" type="Label" parent="VBox/ForgeView/WeaponTypeBox"]
+[node name="WTypeHeaderLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/WeaponTypeBox"]
 layout_mode = 2
 text = "WEAPON ARCHETYPE"
 
-[node name="WTypeRow" type="HBoxContainer" parent="VBox/ForgeView/WeaponTypeBox"]
+[node name="WTypeGrid" type="GridContainer" parent="VBox/ForgeScroll/ForgeView/WeaponTypeBox"]
 layout_mode = 2
-theme_override_constants/separation = 6
+theme_override_constants/h_separation = 8
+theme_override_constants/v_separation = 8
+columns = 2
 
-[node name="TierHeaderLbl" type="Label" parent="VBox/ForgeView"]
+[node name="TierHeaderLbl" type="Label" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 text = "2. SELECT BARROW TIER"
 
-[node name="TierRow" type="HBoxContainer" parent="VBox/ForgeView"]
+[node name="TierRow" type="HBoxContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="CostPanel" type="PanelContainer" parent="VBox/ForgeView"]
+[node name="OddsRow" type="HBoxContainer" parent="VBox/ForgeScroll/ForgeView"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="OddsRare" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="RareLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/OddsRow/OddsRare"]
+layout_mode = 2
+text = "RARE · 70%"
+horizontal_alignment = 1
+
+[node name="OddsEpic" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="EpicLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/OddsRow/OddsEpic"]
+layout_mode = 2
+text = "EPIC · 21%"
+horizontal_alignment = 1
+
+[node name="OddsSov" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView/OddsRow"]
+layout_mode = 2
+size_flags_horizontal = 3
+
+[node name="SovLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/OddsRow/OddsSov"]
+layout_mode = 2
+text = "SOVEREIGN · 9%"
+horizontal_alignment = 1
+
+[node name="CostPanel" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
 
-[node name="CostVBox" type="VBoxContainer" parent="VBox/ForgeView/CostPanel"]
+[node name="CostVBox" type="VBoxContainer" parent="VBox/ForgeScroll/ForgeView/CostPanel"]
 layout_mode = 2
-theme_override_constants/separation = 7
+theme_override_constants/separation = 8
 
-[node name="CostLbl" type="Label" parent="VBox/ForgeView/CostPanel/CostVBox"]
+[node name="CostLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/CostPanel/CostVBox"]
 layout_mode = 2
 text = "COST: 60 GOLD · 12 SCRAP"
 horizontal_alignment = 1
 
-[node name="WalletLbl" type="Label" parent="VBox/ForgeView/CostPanel/CostVBox"]
+[node name="WalletLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/CostPanel/CostVBox"]
 layout_mode = 2
 text = "Your Coffers: 120 Gold · 24 Scrap"
 horizontal_alignment = 1
 
-[node name="ForgeBtn" type="Button" parent="VBox/ForgeView/CostPanel/CostVBox"]
-custom_minimum_size = Vector2(0, 62)
+[node name="ForgeBtn" type="Button" parent="VBox/ForgeScroll/ForgeView/CostPanel/CostVBox"]
+custom_minimum_size = Vector2(0, 84)
 layout_mode = 2
 text = "FORGE RELIC"
 
-[node name="ResultPanel" type="PanelContainer" parent="VBox/ForgeView"]
+[node name="ResultPanel" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView"]
 layout_mode = 2
-size_flags_vertical = 1
 
-[node name="ResultVBox" type="VBoxContainer" parent="VBox/ForgeView/ResultPanel"]
+[node name="ResultVBox" type="VBoxContainer" parent="VBox/ForgeScroll/ForgeView/ResultPanel"]
 layout_mode = 2
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
 
-[node name="ResultHeaderLbl" type="Label" parent="VBox/ForgeView/ResultPanel/ResultVBox"]
+[node name="ResultHeaderLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox"]
 layout_mode = 2
 text = "ANVIL CHAMBER READY"
 
-[node name="ResultCardRow" type="HBoxContainer" parent="VBox/ForgeView/ResultPanel/ResultVBox"]
+[node name="ResultCardRow" type="HBoxContainer" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox"]
 layout_mode = 2
-size_flags_vertical = 1
 theme_override_constants/separation = 14
 
-[node name="ResultIconFrame" type="PanelContainer" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow"]
-custom_minimum_size = Vector2(106, 106)
+[node name="ResultIconFrame" type="PanelContainer" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow"]
+custom_minimum_size = Vector2(96, 96)
 layout_mode = 2
 size_flags_vertical = 4
 
-[node name="ResultIcon" type="TextureRect" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultIconFrame"]
+[node name="ResultIcon" type="TextureRect" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultIconFrame"]
 layout_mode = 2
 expand_mode = 1
 stretch_mode = 5
 
-[node name="ResultInfoVBox" type="VBoxContainer" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow"]
+[node name="ResultInfoVBox" type="VBoxContainer" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow"]
 layout_mode = 2
 size_flags_horizontal = 3
 alignment = 1
 theme_override_constants/separation = 4
 
-[node name="ResultNameLbl" type="Label" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
+[node name="ResultNameLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
 layout_mode = 2
 text = "Strike the Soul Forge"
 autowrap_mode = 3
 
-[node name="ResultMetaLbl" type="Label" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
+[node name="ResultMetaLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
 layout_mode = 2
 text = "Choose a Relic Slot and Tier above"
 autowrap_mode = 3
 
-[node name="ResultAffixLbl" type="Label" parent="VBox/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
+[node name="ResultAffixLbl" type="Label" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox/ResultCardRow/ResultInfoVBox"]
 layout_mode = 2
 text = "• Forged relics roll 1 to 3 Barrow Affixes immediately."
 autowrap_mode = 3
 
-[node name="EquipNowBtn" type="Button" parent="VBox/ForgeView/ResultPanel/ResultVBox"]
+[node name="EquipNowBtn" type="Button" parent="VBox/ForgeScroll/ForgeView/ResultPanel/ResultVBox"]
 visible = false
-custom_minimum_size = Vector2(0, 48)
+custom_minimum_size = Vector2(0, 68)
 layout_mode = 2
 text = "EQUIP NOW"
-
-[node name="OddsPanel" type="PanelContainer" parent="VBox/ForgeView"]
-custom_minimum_size = Vector2(0, 142)
-layout_mode = 2
-size_flags_vertical = 1
-
-[node name="OddsVBox" type="VBoxContainer" parent="VBox/ForgeView/OddsPanel"]
-layout_mode = 2
-alignment = 1
-theme_override_constants/separation = 8
-
-[node name="OddsHeaderLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
-layout_mode = 2
-text = "ANVIL COVENANT & RARITY ODDS"
-
-[node name="OddsRow" type="HBoxContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
-layout_mode = 2
-theme_override_constants/separation = 8
-
-[node name="OddsRare" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="RareLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsRare"]
-layout_mode = 2
-text = "RARE · 70%\n1 Barrow Affix"
-horizontal_alignment = 1
-
-[node name="OddsEpic" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="EpicLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsEpic"]
-layout_mode = 2
-text = "EPIC · 21%\n2 Barrow Affixes"
-horizontal_alignment = 1
-
-[node name="OddsSov" type="PanelContainer" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow"]
-layout_mode = 2
-size_flags_horizontal = 3
-
-[node name="SovLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox/OddsRow/OddsSov"]
-layout_mode = 2
-text = "SOVEREIGN · 9%\n3 Barrow Affixes"
-horizontal_alignment = 1
-
-[node name="OddsFootLbl" type="Label" parent="VBox/ForgeView/OddsPanel/OddsVBox"]
-layout_mode = 2
-text = "Forged relics enter your satchel immediately and can be tempered up to +5 at the Armory."
-horizontal_alignment = 1
-autowrap_mode = 3
 
 [node name="BestiaryView" type="VBoxContainer" parent="VBox"]
 visible = false
 layout_mode = 2
 size_flags_vertical = 3
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10
 
 [node name="BestiaryHeaderLbl" type="Label" parent="VBox/BestiaryView"]
 layout_mode = 2
@@ -230,4 +216,4 @@ horizontal_scroll_mode = 0
 [node name="BestiaryList" type="VBoxContainer" parent="VBox/BestiaryView/BestiaryScroll"]
 layout_mode = 2
 size_flags_horizontal = 3
-theme_override_constants/separation = 8
+theme_override_constants/separation = 10

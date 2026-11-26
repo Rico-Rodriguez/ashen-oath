@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://dse01rksweu1g"
-path="res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.ctex"
+path.s3tc="res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.s3tc.ctex"
+path.etc2="res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "eda2fe02b50cd268553e4b0e4fb907b9"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/zweihander_baked_orm.webp"
-dest_files=["res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.ctex"]
+dest_files=["res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.s3tc.ctex", "res://.godot/imported/zweihander_baked_orm.webp-e6d56856f40f38733940964d6688b71f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

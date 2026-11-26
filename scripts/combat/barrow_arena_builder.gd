@@ -7,6 +7,10 @@ const BOSS_GATE_Z := -32.0
 const BOSS_CENTER := Vector3(0.0, 0.0, -45.0)
 const BOSS_RADIUS := 14.0
 const FLANK_SIDES: Array[float] = [-1.0, 1.0]
+const VFX_NOISE_TEX_PATH := "res://assets/textures/vfx_noise_tile.png"
+const CATHEDRAL_IBL_PANORAMA_PATH := "res://assets/textures/cathedral_ibl_panorama.png"
+
+static var _cached_panorama_sky: Sky = null
 
 const CLEARING_SPECS := [
 	{"center": Vector3(0.0, 0.0, 22.0), "radius": 10.5, "count": 6},
@@ -30,7 +34,7 @@ static func build_zone(parent: Node3D, zone_def: ZoneDef, seed_val: int = 1337) 
 	var headless := DisplayServer.get_name() == "headless"
 
 	var clearings := _build_clearings_data(rng)
-	var gate_refs := {"root": null, "bars": null, "ward": null, "collider": null, "light": null}
+	var gate_refs := {"root": null, "arch_visuals": null, "bars": null, "ward": null, "ground_seal_mat": null, "collider": null, "light": null}
 
 	if parent != null and is_instance_valid(parent):
 		var cache := _make_build_cache(profile, headless)
@@ -62,10 +66,18 @@ static func build_zone(parent: Node3D, zone_def: ZoneDef, seed_val: int = 1337) 
 	if layout_owner != null:
 		layout_owner.set_meta("_barrow_layout_ref", layout)
 	var wr_parent: WeakRef = weakref(parent) if parent != null and is_instance_valid(parent) else null
+	var wr_arch: WeakRef = weakref(gate_refs["arch_visuals"]) if gate_refs["arch_visuals"] != null else null
 	var wr_col: WeakRef = weakref(gate_refs["collider"]) if gate_refs["collider"] != null else null
 	var wr_ward: WeakRef = weakref(gate_refs["ward"]) if gate_refs["ward"] != null else null
+	var wr_ground_seal_mat: WeakRef = weakref(gate_refs["ground_seal_mat"]) if gate_refs["ground_seal_mat"] != null else null
 	var wr_light: WeakRef = weakref(gate_refs["light"]) if gate_refs["light"] != null else null
 	var wr_bars: WeakRef = weakref(gate_refs["bars"]) if gate_refs["bars"] != null else null
+
+	layout["set_boss_gate_arch_visible"] = func(is_vis: bool) -> void:
+		if wr_arch != null:
+			var arch_node := wr_arch.get_ref() as Node3D
+			if arch_node != null and is_instance_valid(arch_node):
+				arch_node.visible = is_vis
 
 	layout["unlock_boss_gate"] = func() -> void:
 		if wr_owner != null:
@@ -86,6 +98,11 @@ static func build_zone(parent: Node3D, zone_def: ZoneDef, seed_val: int = 1337) 
 			var ward := wr_ward.get_ref() as Node3D
 			if ward != null and is_instance_valid(ward):
 				ward.visible = false
+		if wr_ground_seal_mat != null:
+			var gmat := wr_ground_seal_mat.get_ref() as ShaderMaterial
+			if gmat != null:
+				gmat.set_shader_parameter("energy_color", Color(0.42, 0.78, 1.0, 1.0))
+				gmat.set_shader_parameter("hdr_gain", 1.35)
 		if wr_light != null:
 			var glight := wr_light.get_ref() as OmniLight3D
 			if glight != null and is_instance_valid(glight):
@@ -324,11 +341,14 @@ static func _make_build_cache(profile: Dictionary, headless: bool) -> Dictionary
 	cache["brazier_flame_mesh"] = flame_quad
 
 	var flame_sh := load("res://shaders/vfx_smokey_flame.gdshader") as Shader
+	var noise_tex := load(VFX_NOISE_TEX_PATH) as Texture2D
 	for slot_key in ["brazier_primary", "brazier_secondary"]:
 		var bspec: Dictionary = profile[slot_key]
 		if flame_sh != null:
 			var fmat := ShaderMaterial.new()
 			fmat.shader = flame_sh
+			if noise_tex != null:
+				fmat.set_shader_parameter("noise_tex", noise_tex)
 			fmat.set_shader_parameter("billboard_mode", true)
 			fmat.set_shader_parameter("soot_dominance", float(bspec["soot"]))
 			fmat.set_shader_parameter("core_hdr", bspec["core_hdr"] as Vector3)
@@ -389,12 +409,9 @@ static func _configure_or_create_lighting(parent: Node3D, profile: Dictionary) -
 
 	var fog_col: Color = profile["fog_color"]
 
-	var sky := Sky.new()
-	if ResourceLoader.exists("res://assets/textures/cathedral_ibl_panorama.png"):
-		var pmat := PanoramaSkyMaterial.new()
-		pmat.panorama = load("res://assets/textures/cathedral_ibl_panorama.png") as Texture2D
-		sky.sky_material = pmat
-	else:
+	var sky := _get_cached_panorama_sky()
+	if sky == null:
+		sky = Sky.new()
 		var sky_sh := load("res://shaders/sky_cathedral_ibl.gdshader") as Shader
 		if sky_sh != null:
 			var smat := ShaderMaterial.new()
@@ -435,8 +452,25 @@ static func _configure_or_create_lighting(parent: Node3D, profile: Dictionary) -
 	moon.light_color = profile["moon_color"] as Color
 	moon.light_energy = float(profile["moon_energy"])
 	moon.shadow_enabled = true
-	moon.directional_shadow_max_distance = 76.0
+	moon.directional_shadow_mode = DirectionalLight3D.SHADOW_ORTHOGONAL
+	moon.directional_shadow_max_distance = 36.0
 	moon.rotation_degrees = profile["moon_rot"] as Vector3
+
+
+static func _get_cached_panorama_sky() -> Sky:
+	if _cached_panorama_sky != null:
+		return _cached_panorama_sky
+	if ResourceLoader.exists(CATHEDRAL_IBL_PANORAMA_PATH):
+		var pano := load(CATHEDRAL_IBL_PANORAMA_PATH) as Texture2D
+		if pano != null:
+			var pmat := PanoramaSkyMaterial.new()
+			pmat.panorama = pano
+			pmat.energy_multiplier = 1.25
+			var sky := Sky.new()
+			sky.sky_material = pmat
+			_cached_panorama_sky = sky
+			return _cached_panorama_sky
+	return null
 
 
 static func _build_ground(parent: Node3D, profile: Dictionary, headless: bool) -> void:
@@ -459,6 +493,9 @@ static func _build_ground(parent: Node3D, profile: Dictionary, headless: bool) -
 	var gmat := ShaderMaterial.new()
 	gmat.shader = ground_sh
 	gmat.set_shader_parameter("ground_tint", profile["ground_tint"] as Color)
+	var noise_tex := load(VFX_NOISE_TEX_PATH) as Texture2D
+	if noise_tex != null:
+		gmat.set_shader_parameter("noise_tex", noise_tex)
 
 	var f_alb := load(str(profile["tex_forest_c"])) as Texture2D
 	var f_nrm := load(str(profile["tex_forest_n"])) as Texture2D
@@ -488,6 +525,7 @@ static func _build_ground(parent: Node3D, profile: Dictionary, headless: bool) -
 	ground_mi.mesh = pm
 	ground_mi.position = Vector3(0.0, 0.0, -10.0)
 	ground_mi.material_override = gmat
+	ground_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	parent.add_child(ground_mi)
 
 
@@ -555,9 +593,14 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 	gate_root.add_child(sb)
 	gate_refs["collider"] = col
 
+	var arch_visuals := Node3D.new()
+	arch_visuals.name = "GateArchVisuals"
+	gate_root.add_child(arch_visuals)
+	gate_refs["arch_visuals"] = arch_visuals
+
 	var bars_holder := Node3D.new()
 	bars_holder.name = "IronPortcullis"
-	gate_root.add_child(bars_holder)
+	arch_visuals.add_child(bars_holder)
 	gate_refs["bars"] = bars_holder
 
 	if headless:
@@ -570,7 +613,7 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		gate_inst.name = "KitBossGateModel"
 		gate_inst.scale = Vector3(1.95, 1.38, 1.38)
 		_apply_gothic_stone_materials(gate_inst, cache)
-		gate_root.add_child(gate_inst)
+		arch_visuals.add_child(gate_inst)
 		var port_bars := gate_inst.find_child("PortcullisBars", true, false) as Node3D
 		if port_bars != null:
 			gate_refs["bars"] = port_bars
@@ -582,7 +625,7 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		wing.mesh = wing_box
 		wing.position = Vector3(side_s * 13.4, 2.55, 0.0)
 		wing.material_override = stone_mat
-		gate_root.add_child(wing)
+		arch_visuals.add_child(wing)
 
 	var ward_root := Node3D.new()
 	ward_root.name = "RuneWardSeal"
@@ -605,13 +648,36 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		seal_mi.rotation_degrees.x = 90.0
 		seal_mi.position = Vector3(0.0, 2.65, 0.22)
 		seal_mi.material_override = wmat
+		seal_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		ward_root.add_child(seal_mi)
+
+		var ground_seal_root := Node3D.new()
+		ground_seal_root.name = "GroundWardSeal"
+		gate_root.add_child(ground_seal_root)
+
+		var gmat := ShaderMaterial.new()
+		gmat.shader = energy_sh
+		gmat.set_shader_parameter("beam_mode", 1)
+		gmat.set_shader_parameter("energy_color", ward_col)
+		gmat.set_shader_parameter("hdr_gain", 1.65)
+		gmat.set_shader_parameter("fade_alpha", 0.85)
+		gate_refs["ground_seal_mat"] = gmat
+
+		var gseal_mi := MeshInstance3D.new()
+		gseal_mi.name = "GroundWardRing"
+		var gq := PlaneMesh.new()
+		gq.size = Vector2(7.6, 7.6)
+		gseal_mi.mesh = gq
+		gseal_mi.position = Vector3(0.0, 0.036, 0.0)
+		gseal_mi.material_override = gmat
+		gseal_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		ground_seal_root.add_child(gseal_mi)
 
 	var glight := OmniLight3D.new()
 	glight.position = Vector3(0.0, 2.8, 1.0)
 	glight.light_color = ward_col
 	glight.light_energy = 2.2
-	glight.omni_range = 8.5
+	glight.omni_range = 7.5
 	glight.shadow_enabled = false
 	gate_root.add_child(glight)
 	gate_refs["light"] = glight
@@ -625,7 +691,7 @@ static func _build_shrine_sanctuary(parent: Node3D, profile: Dictionary, cache: 
 
 	for side_s: float in FLANK_SIDES:
 		_spawn_ruin_pillar(s_root, Vector3(side_s * 5.2, 0.0, -1.2), 5.6, cache)
-		_spawn_brazier(s_root, Vector3(side_s * 3.8, 0.0, 1.4), "brazier_primary", profile, cache)
+		_spawn_brazier(s_root, Vector3(side_s * 3.8, 0.0, 1.4), "brazier_primary", profile, cache, side_s < 0.0)
 
 
 static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache: Dictionary, rng: RandomNumberGenerator) -> void:
@@ -636,12 +702,15 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 	var zid := str(profile["id"])
 
 	for side_s: float in FLANK_SIDES:
-		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, 33.0), "brazier_primary", profile, cache)
+		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, 33.0), "brazier_primary", profile, cache, side_s < 0.0)
 		_spawn_ruin_pillar(props, Vector3(side_s * 7.8, 0.0, 34.4), 6.2, cache)
 
 	if zid == "fringe":
-		for az: float in [28.5, 11.5, -3.0, -20.5, -53.8]:
-			_spawn_gothic_arch(props, Vector3(0.0, 0.0, az), Vector3(2.28, 1.38, 1.25), cache)
+		for az: float in [28.5, 11.5, -3.0, -20.5]:
+			for side_s: float in FLANK_SIDES:
+				_spawn_gothic_arch(props, Vector3(side_s * 14.2, 0.0, az), Vector3(1.18, 1.24, 1.15), cache, PI * 0.5)
+		for side_s: float in FLANK_SIDES:
+			_spawn_gothic_arch(props, Vector3(side_s * 12.8, 0.0, -53.8), Vector3(1.12, 1.18, 1.12), cache, side_s * 0.65)
 
 	var idx := 0
 	for spec in CLEARING_SPECS:
@@ -649,7 +718,7 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 		var r := float(spec["radius"])
 		for side_s: float in FLANK_SIDES:
 			var slot := "brazier_secondary" if (idx + (1 if side_s > 0.0 else 0)) % 2 == 1 else "brazier_primary"
-			_spawn_brazier(props, Vector3(side_s * 5.6, 0.0, c.z + r * 0.88), slot, profile, cache)
+			_spawn_brazier(props, Vector3(side_s * 5.6, 0.0, c.z + r * 0.88), slot, profile, cache, idx == 1 and side_s > 0.0)
 			_spawn_ruin_pillar(props, Vector3(side_s * (r + 1.6), 0.0, c.z - 2.2), rng.randf_range(5.2, 6.8), cache)
 			_spawn_ruin_pillar(props, Vector3(side_s * (r + 1.9), 0.0, c.z + 3.4), rng.randf_range(4.6, 6.4), cache)
 		if zid == "catacombs":
@@ -658,10 +727,10 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 
 	for side_s: float in FLANK_SIDES:
 		var b_slot := "brazier_secondary" if side_s > 0.0 else "brazier_primary"
-		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, BOSS_GATE_Z + 1.8), "brazier_primary", profile, cache)
-		_spawn_brazier(props, Vector3(side_s * 8.6, 0.0, -38.5), b_slot, profile, cache)
-		_spawn_brazier(props, Vector3(side_s * 10.6, 0.0, -45.5), "brazier_primary", profile, cache)
-		_spawn_brazier(props, Vector3(side_s * 8.4, 0.0, -52.5), b_slot, profile, cache)
+		_spawn_brazier(props, Vector3(side_s * 5.2, 0.0, BOSS_GATE_Z + 1.8), "brazier_primary", profile, cache, false)
+		_spawn_brazier(props, Vector3(side_s * 8.6, 0.0, -38.5), b_slot, profile, cache, false)
+		_spawn_brazier(props, Vector3(side_s * 10.6, 0.0, -45.5), "brazier_primary", profile, cache, true)
+		_spawn_brazier(props, Vector3(side_s * 8.4, 0.0, -52.5), b_slot, profile, cache, false)
 
 	if zid == "catacombs":
 		_spawn_catacomb_arch(props, Vector3(0.0, 0.0, -35.8), 24.0, 6.4, cache)
@@ -674,13 +743,14 @@ static func _build_ruins_and_braziers(parent: Node3D, profile: Dictionary, cache
 		_spawn_ruin_pillar(props, Vector3(px, 0.0, pz), rng.randf_range(5.4, 7.0), cache)
 
 
-static func _spawn_gothic_arch(parent: Node3D, pos: Vector3, scale_vec: Vector3, cache: Dictionary) -> void:
+static func _spawn_gothic_arch(parent: Node3D, pos: Vector3, scale_vec: Vector3, cache: Dictionary, yaw_rad: float = 0.0) -> void:
 	var arch_ps := cache.get("kit_arch") as PackedScene
 	if arch_ps == null:
 		return
 	var arch := arch_ps.instantiate() as Node3D
-	arch.name = "GothicNaveArch"
+	arch.name = "GothicColonnadeArch"
 	arch.position = pos
+	arch.rotation.y = yaw_rad
 	arch.scale = scale_vec
 	_apply_gothic_stone_materials(arch, cache)
 	parent.add_child(arch)
@@ -741,30 +811,34 @@ static func _spawn_standing_monolith(parent: Node3D, pos: Vector3, height: float
 
 static func _spawn_catacomb_arch(parent: Node3D, pos: Vector3, span_w: float, arch_h: float, cache: Dictionary) -> void:
 	var holder := Node3D.new()
-	holder.name = "CatacombBridgeArch"
+	holder.name = "CatacombFlankFrame"
 	holder.position = pos
 	parent.add_child(holder)
 
+	var half_span := maxf(span_w * 0.5, 10.4)
 	var stone_mat := cache["stone_mat"] as Material
 	var col_box := BoxMesh.new()
 	col_box.size = Vector3(1.9, arch_h, 1.9)
+	var cap_box := BoxMesh.new()
+	cap_box.size = Vector3(2.5, 0.85, 2.5)
 	for side_s: float in FLANK_SIDES:
+		var flank_x := side_s * half_span
 		var col := MeshInstance3D.new()
 		col.mesh = col_box
-		col.position = Vector3(side_s * (span_w * 0.5), arch_h * 0.5, 0.0)
+		col.position = Vector3(flank_x, arch_h * 0.5, 0.0)
 		col.material_override = stone_mat
 		holder.add_child(col)
 
-	var beam := MeshInstance3D.new()
-	var bbox := BoxMesh.new()
-	bbox.size = Vector3(span_w + 2.4, 1.05, 1.85)
-	beam.mesh = bbox
-	beam.position = Vector3(0.0, arch_h + 0.45, 0.0)
-	beam.material_override = stone_mat
-	holder.add_child(beam)
+		var cap := MeshInstance3D.new()
+		cap.mesh = cap_box
+		cap.position = Vector3(flank_x, arch_h + 0.42, 0.0)
+		cap.material_override = stone_mat
+		holder.add_child(cap)
+
+		_spawn_gothic_arch(holder, Vector3(flank_x + side_s * 0.65, 0.0, 0.0), Vector3(1.02, clampf(arch_h / 6.2, 0.82, 1.15), 1.05), cache, PI * 0.5)
 
 
-static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profile: Dictionary, cache: Dictionary) -> void:
+static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profile: Dictionary, cache: Dictionary, with_light: bool = false) -> void:
 	var b_root := Node3D.new()
 	b_root.name = "TorchBrazier"
 	b_root.position = pos
@@ -775,6 +849,8 @@ static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profi
 	if brazier_ps != null:
 		var inst := brazier_ps.instantiate() as Node3D
 		inst.scale = Vector3.ONE * 1.15
+		for n in inst.find_children("*", "MeshInstance3D", true, false):
+			(n as MeshInstance3D).cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		b_root.add_child(inst)
 
 	if cache.has(slot_key + "_flame_mat"):
@@ -785,13 +861,14 @@ static func _spawn_brazier(parent: Node3D, pos: Vector3, slot_key: String, profi
 		fmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		b_root.add_child(fmi)
 
-	var light := OmniLight3D.new()
-	light.position = Vector3(0.0, 2.08, 0.0)
-	light.light_color = bspec["light"] as Color
-	light.light_energy = 2.25
-	light.omni_range = 9.5
-	light.shadow_enabled = false
-	b_root.add_child(light)
+	if with_light:
+		var light := OmniLight3D.new()
+		light.position = Vector3(0.0, 2.08, 0.0)
+		light.light_color = bspec["light"] as Color
+		light.light_energy = 2.25
+		light.omni_range = 7.2
+		light.shadow_enabled = false
+		b_root.add_child(light)
 
 
 static func _build_perimeter_biome(parent: Node3D, profile: Dictionary, cache: Dictionary, rng: RandomNumberGenerator) -> void:
@@ -935,27 +1012,16 @@ static func _populate_weald_biome(biome_root: Node3D, cache: Dictionary, rng: Ra
 
 
 static func _populate_catacombs_biome(biome_root: Node3D, cache: Dictionary, rng: RandomNumberGenerator) -> void:
-	var bridge_ps := load("res://assets/models/bridge.glb") as PackedScene
 	var den_ps := load("res://assets/models/den.glb") as PackedScene
 	var crystal_ps := load("res://assets/models/crystal.glb") as PackedScene
 	var flat_ps := load("res://assets/models/rock_flat.glb") as PackedScene
 	var rock_ps := load("res://assets/models/rock_b.glb") as PackedScene
 
-	var slate_tint := Color(0.25, 0.28, 0.44)
+	var slate_tint := Color(0.14, 0.15, 0.21)
 	var crystal_albedo := Color(0.18, 0.30, 0.68)
 	var crystal_glow := Color(0.30, 0.58, 1.0)
 
-	var z_cursor := 38.0
-	while z_cursor >= -56.0:
-		if bridge_ps != null:
-			var b_slab := bridge_ps.instantiate() as Node3D
-			b_slab.position = Vector3(0.0, 0.01, z_cursor)
-			b_slab.scale = Vector3(2.8, 1.2, 2.6)
-			_style_prop(b_slab, "catacombs_slate", slate_tint, Color.BLACK, 0.0, cache)
-			biome_root.add_child(b_slab)
-		z_cursor -= 7.5
-
-	z_cursor = 42.0
+	var z_cursor := 42.0
 	while z_cursor >= -62.0:
 		var min_edge := 15.0 if z_cursor >= BOSS_GATE_Z else 16.5
 		for side_s: float in FLANK_SIDES:
@@ -1162,8 +1228,8 @@ static func _build_rift_ember_ash(parent: Node3D) -> void:
 	proc.color_ramp = gtex
 
 	for spec in [
-		{"name": "CorridorEmbers", "pos": Vector3(0.0, 0.4, 8.0), "amount": 130},
-		{"name": "BossSanctumEmbers", "pos": Vector3(0.0, 0.4, -44.0), "amount": 120},
+		{"name": "CorridorEmbers", "pos": Vector3(0.0, 0.4, 8.0), "amount": 30},
+		{"name": "BossSanctumEmbers", "pos": Vector3(0.0, 0.4, -44.0), "amount": 30},
 	]:
 		var gp := GPUParticles3D.new()
 		gp.name = str(spec["name"])
@@ -1203,6 +1269,7 @@ static func _style_prop(
 		var mi := n as MeshInstance3D
 		if mi.mesh == null:
 			continue
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		for s in mi.mesh.get_surface_count():
 			var mat := mi.get_active_material(s)
 			var mname := mat.resource_name if mat != null else "default"

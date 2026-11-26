@@ -35,6 +35,10 @@ var skill_2_cooldown_max: float = 8.0
 var skill_3_cooldown_left: float = 0.0
 var skill_3_cooldown_max: float = 8.0
 
+const INPUT_BUFFER_SEC: float = 0.16
+const DASH_DISTANCE_M: float = 4.6
+const DASH_DURATION_SEC: float = 0.17
+
 var _is_dead: bool = false
 var _combo_toggle: bool = false
 var _attack_cooldown: float = 0.0
@@ -43,11 +47,14 @@ var _attack_anim_timer: float = 0.0
 var _skill_anim_timer: float = 0.0
 var _skill_slash_ribbon_timer: float = 0.0
 var _locked_attack_dir: Vector3 = Vector3.FORWARD
+var _lock_facing_on_attack: bool = false
+var _buffered_action: String = ""
+var _buffer_timer: float = 0.0
 
 var _iframe_timer: float = 0.0
 var _dash_timer: float = 0.0
 var _dash_dir: Vector3 = Vector3.FORWARD
-var _dash_speed: float = 34.444
+var _dash_speed: float = DASH_DISTANCE_M / DASH_DURATION_SEC
 var _ward_hold_timer: float = 0.0
 
 var _whirlwind_timer: float = 0.0
@@ -100,6 +107,9 @@ func setup(
 		rng.randomize()
 
 	_is_dead = false
+	_buffered_action = ""
+	_buffer_timer = 0.0
+	_lock_facing_on_attack = false
 	current_hp = stats.max_hp
 	ward_hp = 0.0
 	_recompute_cooldown_caps()
@@ -192,6 +202,7 @@ func _physics_process(delta: float) -> void:
 
 	_tick_timers(delta)
 	_poll_action_triggers()
+	_consume_buffered_action()
 
 	var move_dir := _read_move_direction()
 
@@ -220,7 +231,7 @@ func _physics_process(delta: float) -> void:
 	if _whirlwind_timer > 0.0:
 		speed_mult = 1.10
 	elif _attack_strike_window > 0.0:
-		speed_mult = 0.88 if stats.is_ranged else 0.82
+		speed_mult = 0.94
 
 	velocity = move_dir * (stats.move_speed * speed_mult)
 	move_and_slide()
@@ -236,11 +247,11 @@ func _physics_process(delta: float) -> void:
 			if absf(visual.rotation.y) < 0.01:
 				visual.rotation.y = 0.0
 		var was_striking := _attack_strike_window > 0.0
-		_try_auto_or_manual_attack()
+		_try_auto_or_manual_attack(move_dir)
 		if not was_striking and _attack_strike_window > 0.0:
-			velocity = move_dir * (stats.move_speed * (0.88 if stats.is_ranged else 0.82))
+			velocity = move_dir * (stats.move_speed * 0.94)
 
-	if _attack_strike_window > 0.0 or _skill_anim_timer > 0.0:
+	if _skill_anim_timer > 0.0 or (_attack_strike_window > 0.0 and _lock_facing_on_attack):
 		_face_direction_smooth(_locked_attack_dir, 26.0, delta)
 	elif move_dir.length_squared() > 0.0004:
 		_face_direction_smooth(move_dir, 16.0, delta)
@@ -280,6 +291,10 @@ func _tick_timers(delta: float) -> void:
 		_skill_anim_timer = maxf(0.0, _skill_anim_timer - delta)
 	if _skill_slash_ribbon_timer > 0.0:
 		_skill_slash_ribbon_timer = maxf(0.0, _skill_slash_ribbon_timer - delta)
+	if _buffer_timer > 0.0:
+		_buffer_timer = maxf(0.0, _buffer_timer - delta)
+		if _buffer_timer <= 0.0:
+			_buffered_action = ""
 
 	if ward_hp > 0.0:
 		if _ward_hold_timer > 0.0:
@@ -311,7 +326,31 @@ func _read_move_direction() -> Vector3:
 	return Vector3(v2.x, 0.0, v2.y)
 
 
-func _try_auto_or_manual_attack() -> void:
+func _buffer_action(action_id: String) -> void:
+	_buffered_action = action_id
+	_buffer_timer = INPUT_BUFFER_SEC
+
+
+func _consume_buffered_action() -> void:
+	if _buffered_action == "" or _buffer_timer <= 0.0:
+		return
+	var act := _buffered_action
+	var fired := false
+	match act:
+		"dash":
+			fired = trigger_dash(false)
+		"skill_1":
+			fired = trigger_skill_1(false)
+		"skill_2":
+			fired = trigger_skill_2(false)
+		"skill_3":
+			fired = trigger_skill_3(false)
+	if fired:
+		_buffered_action = ""
+		_buffer_timer = 0.0
+
+
+func _try_auto_or_manual_attack(move_dir: Vector3 = Vector3.ZERO) -> void:
 	if _attack_cooldown > 0.0:
 		manual_attack_requested = false
 		return
@@ -323,21 +362,30 @@ func _try_auto_or_manual_attack() -> void:
 	manual_attack_requested = false
 
 	if (auto_attack_enabled and nearest != null) or manual:
-		_perform_primary_attack(nearest)
+		_perform_primary_attack(nearest, move_dir)
 
 
-func _perform_primary_attack(target: Node3D) -> void:
+func _perform_primary_attack(target: Node3D, move_dir: Vector3 = Vector3.ZERO) -> void:
 	_attack_cooldown = stats.attack_interval
 	_attack_strike_window = 0.14
 	_attack_anim_timer = minf(0.46, stats.attack_interval * 0.78)
 
 	var forward := _forward_dir()
+	var is_kiting_away := false
 	if target != null and is_instance_valid(target):
 		var to_t := Vector3(target.global_position.x - global_position.x, 0.0, target.global_position.z - global_position.z)
-		if to_t.length_squared() > 0.0001:
-			forward = to_t.normalized()
-	_locked_attack_dir = forward
-	_face_direction_instant(forward)
+		var dist_t := to_t.length()
+		if dist_t > 0.01:
+			forward = to_t / dist_t
+			if move_dir.length() > 0.25 and dist_t > stats.attack_range * 0.82:
+				if move_dir.normalized().dot(forward) < -0.25:
+					is_kiting_away = true
+	if is_kiting_away:
+		_lock_facing_on_attack = false
+	else:
+		_locked_attack_dir = forward
+		_lock_facing_on_attack = true
+		_face_direction_instant(forward)
 
 	if visual != null:
 		var clip := "attack2" if _combo_toggle else "attack"
@@ -374,10 +422,12 @@ func _perform_primary_attack(target: Node3D) -> void:
 			deliver_hit_to_enemy(enemy, stats.attack_damage, "primary", DamageEvent.Kind.PHYSICAL)
 
 
-func trigger_dash() -> bool:
+func trigger_dash(allow_buffer: bool = true) -> bool:
 	if _is_dead or stats == null or class_def == null or class_def.dash_ability == null:
 		return false
 	if dash_cooldown_left > 0.0 or _dash_timer > 0.0:
+		if allow_buffer:
+			_buffer_action("dash")
 		return false
 
 	_recompute_cooldown_caps()
@@ -387,9 +437,17 @@ func trigger_dash() -> bool:
 	_charge_timer = 0.0
 
 	var move_dir := _read_move_direction()
-	_dash_dir = move_dir.normalized() if move_dir.length_squared() > 0.001 else _forward_dir()
-	_dash_timer = 0.18
-	_dash_speed = 6.2 / 0.18
+	if move_dir.length() >= 0.1:
+		_dash_dir = move_dir.normalized()
+	else:
+		var close_enemy := _find_nearest_enemy(5.5)
+		if close_enemy != null:
+			var away := Vector3(global_position.x - close_enemy.global_position.x, 0.0, global_position.z - close_enemy.global_position.z)
+			_dash_dir = away.normalized() if away.length_squared() > 0.0001 else -_forward_dir()
+		else:
+			_dash_dir = _forward_dir()
+	_dash_timer = DASH_DURATION_SEC
+	_dash_speed = DASH_DISTANCE_M / DASH_DURATION_SEC
 	_iframe_timer = maxf(_iframe_timer, 0.26)
 	_face_direction_instant(_dash_dir)
 
@@ -409,46 +467,55 @@ func trigger_dash() -> bool:
 	return true
 
 
-func trigger_skill_1() -> bool:
+func trigger_skill_1(allow_buffer: bool = true) -> bool:
 	if _is_dead or stats == null or class_def == null or class_def.skill_1 == null:
 		return false
 	if skill_1_cooldown_left > 0.0 or _dash_timer > 0.0 or _charge_timer > 0.0:
+		if allow_buffer:
+			_buffer_action("skill_1")
 		return false
 
 	_recompute_cooldown_caps()
+	if not _execute_ability(class_def.skill_1):
+		return false
 	skill_1_cooldown_left = skill_1_cooldown_max
-	_execute_ability(class_def.skill_1)
 	_emit_cooldowns()
 	return true
 
 
-func trigger_skill_2() -> bool:
+func trigger_skill_2(allow_buffer: bool = true) -> bool:
 	if _is_dead or stats == null or class_def == null or class_def.skill_2 == null:
 		return false
 	if skill_2_cooldown_left > 0.0 or _dash_timer > 0.0 or _charge_timer > 0.0:
+		if allow_buffer:
+			_buffer_action("skill_2")
 		return false
 
 	_recompute_cooldown_caps()
+	if not _execute_ability(class_def.skill_2):
+		return false
 	skill_2_cooldown_left = skill_2_cooldown_max
-	_execute_ability(class_def.skill_2)
 	_emit_cooldowns()
 	return true
 
 
-func trigger_skill_3() -> bool:
+func trigger_skill_3(allow_buffer: bool = true) -> bool:
 	if _is_dead or stats == null or class_def == null or class_def.skill_3 == null:
 		return false
 	if skill_3_cooldown_left > 0.0 or _dash_timer > 0.0 or _charge_timer > 0.0:
+		if allow_buffer:
+			_buffer_action("skill_3")
 		return false
 
 	_recompute_cooldown_caps()
+	if not _execute_ability(class_def.skill_3):
+		return false
 	skill_3_cooldown_left = skill_3_cooldown_max
-	_execute_ability(class_def.skill_3)
 	_emit_cooldowns()
 	return true
 
 
-func _execute_ability(ab: AbilityDef) -> void:
+func _execute_ability(ab: AbilityDef) -> bool:
 	match ab.ability_id:
 		"iron_tempest":
 			_whirlwind_timer = 2.0
@@ -480,6 +547,13 @@ func _execute_ability(ab: AbilityDef) -> void:
 			var is_slam := ab.anim_clip == "skill_slam"
 			var target_pos := _find_best_cluster_pos(10.0, radius)
 			var to_p := Vector3(target_pos.x - global_position.x, 0.0, target_pos.z - global_position.z)
+			if to_p.length() > 7.8:
+				to_p = to_p.normalized() * 7.8
+				target_pos = Vector3(global_position.x + to_p.x, 0.0, global_position.z + to_p.z)
+			if director != null and director.has_method("clamp_arena_position"):
+				target_pos = director.call("clamp_arena_position", target_pos)
+			target_pos.y = 0.0
+			to_p = Vector3(target_pos.x - global_position.x, 0.0, target_pos.z - global_position.z)
 			if to_p.length_squared() > 0.0001:
 				_locked_attack_dir = to_p.normalized()
 				_face_direction_instant(_locked_attack_dir)
@@ -508,18 +582,17 @@ func _execute_ability(ab: AbilityDef) -> void:
 			})
 		"stormbrand_arc":
 			var max_targets := 4 + stats.chain_bonus_targets
-			var origin := visual.get_cast_origin_global() if visual != null else (global_position + Vector3(0.0, 1.2, 0.0))
 			var chained := _collect_chain_targets(global_position, 9.5, max_targets)
+			if chained.is_empty():
+				return false
+			var origin := visual.get_cast_origin_global() if visual != null else (global_position + Vector3(0.0, 1.2, 0.0))
 			var points := PackedVector3Array([origin])
-			if not chained.is_empty():
-				var first_dir := Vector3(chained[0].global_position.x - global_position.x, 0.0, chained[0].global_position.z - global_position.z)
-				if first_dir.length_squared() > 0.0001:
-					_locked_attack_dir = first_dir.normalized()
-					_face_direction_instant(_locked_attack_dir)
-				for e in chained:
-					points.append(e.global_position + Vector3(0.0, 1.05, 0.0))
-			else:
-				points.append(origin + _forward_dir() * 6.0)
+			var first_dir := Vector3(chained[0].global_position.x - global_position.x, 0.0, chained[0].global_position.z - global_position.z)
+			if first_dir.length_squared() > 0.0001:
+				_locked_attack_dir = first_dir.normalized()
+				_face_direction_instant(_locked_attack_dir)
+			for e in chained:
+				points.append(e.global_position + Vector3(0.0, 1.05, 0.0))
 			_skill_anim_timer = 0.34
 			if visual != null:
 				visual.play_anim("skill_cast", 1.35, true)
@@ -583,6 +656,7 @@ func _execute_ability(ab: AbilityDef) -> void:
 					0,
 					DamageEvent.Kind.SHADOW
 				)
+	return true
 
 
 func _tick_whirlwind(delta: float) -> void:
@@ -740,7 +814,7 @@ func deliver_hit_to_enemy(
 		if director != null:
 			if is_crit or heavy_skill or killed:
 				if director.has_method("trigger_hitstop"):
-					director.call("trigger_hitstop", 0.036)
+					director.call("trigger_hitstop", 0.028)
 				if director.has_method("add_camera_kick"):
 					director.call("add_camera_kick", kb_dir, 0.24 if (is_crit or heavy_skill) else 0.16)
 
@@ -848,6 +922,7 @@ func _mount_visual() -> void:
 	visual.has_plume = stats.has_plume
 	visual.lantern_color = stats.lantern_color
 	visual.slot_overrides = slot_ov
+	visual.defer_hero_dress = true
 	add_child(visual)
 	HeroRigDresser.dress(
 		visual,
@@ -1016,14 +1091,34 @@ func _find_nearest_enemy(max_range: float) -> Node3D:
 
 
 func _aim_direction_for_skill(search_range: float) -> Vector3:
+	var mv := _read_move_direction()
+	if mv.length() > 0.20:
+		var steer := mv.normalized()
+		var cos_cone := cos(deg_to_rad(55.0))
+		var best: Node3D = null
+		var best_d := search_range
+		for raw in _get_alive_enemies():
+			var e := raw as Node3D
+			var to_e := Vector3(e.global_position.x - global_position.x, 0.0, e.global_position.z - global_position.z)
+			var d := to_e.length()
+			if d <= 0.0001:
+				continue
+			var eff_d := d - _enemy_radius(e) * 0.5
+			if eff_d > best_d:
+				continue
+			if steer.dot(to_e / d) >= cos_cone:
+				best_d = eff_d
+				best = e
+		if best != null:
+			var aim := Vector3(best.global_position.x - global_position.x, 0.0, best.global_position.z - global_position.z)
+			if aim.length_squared() > 0.0001:
+				return aim.normalized()
+		return steer
 	var nearest := _find_nearest_enemy(search_range)
 	if nearest != null:
 		var to_e := Vector3(nearest.global_position.x - global_position.x, 0.0, nearest.global_position.z - global_position.z)
 		if to_e.length_squared() > 0.0001:
 			return to_e.normalized()
-	var mv := _read_move_direction()
-	if mv.length_squared() > 0.001:
-		return mv.normalized()
 	return _forward_dir()
 
 

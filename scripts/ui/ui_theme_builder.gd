@@ -73,8 +73,29 @@ static func clear_cache() -> void:
 
 static func get_theme() -> Theme:
 	if _theme_cache == null:
-		_theme_cache = load("res://scenes/ui/dark_theme.tres") as Theme
+		var base := load("res://scenes/ui/dark_theme.tres") as Theme
+		if base != null:
+			_theme_cache = base.duplicate() as Theme
+			_theme_cache.set_icon("grabber", "HSlider", get_slider_grabber_texture(false))
+			_theme_cache.set_icon("grabber_highlight", "HSlider", get_slider_grabber_texture(true))
+			_theme_cache.set_icon("grabber_disabled", "HSlider", get_slider_grabber_texture(false))
 	return _theme_cache
+
+
+static func get_text_scale() -> float:
+	var ml := Engine.get_main_loop()
+	if ml is SceneTree:
+		var st := ml as SceneTree
+		if st.root != null:
+			var ad := st.root.get_node_or_null("AudioDirector")
+			if ad != null and ad.has_method("text_scale"):
+				return clampf(float(ad.call("text_scale")), 0.85, 1.40)
+	return 1.0
+
+
+static func scaled_font_px(base_px: int, max_scale: float = 1.30) -> int:
+	var sc := minf(get_text_scale(), max_scale)
+	return maxi(10, roundi(float(base_px) * sc))
 
 
 static func font_title() -> FontFile:
@@ -141,19 +162,95 @@ static func get_ui_icon(icon_name: String) -> Texture2D:
 	return _load_tex("res://assets/sprites/icons/%s.png" % icon_name)
 
 
+static func get_fx_icon(icon_name: String) -> Texture2D:
+	return _load_tex("res://assets/sprites/fx/%s.png" % icon_name)
+
+
+static func get_vignette_texture() -> Texture2D:
+	return _load_tex("res://assets/sprites/ui/vignette.png")
+
+
 static func get_skill_icon(ability_id: String) -> Texture2D:
-	var mapped := ability_id
+	var tex := _load_tex("res://assets/sprites/ui/skills/%s.png" % ability_id)
+	if tex != null:
+		return tex
+	var fallback := "iron_tempest"
 	match ability_id:
 		"reaping_sweep":
-			mapped = "iron_tempest"
+			fallback = "iron_tempest"
 		"wraith_lances":
-			mapped = "stormbrand_arc"
+			fallback = "stormbrand_arc"
 		"phase_blink", "shadow_step":
-			mapped = "iron_roll"
-	var tex := _load_tex("res://assets/sprites/ui/skills/%s.png" % mapped)
+			fallback = "iron_roll"
+	tex = _load_tex("res://assets/sprites/ui/skills/%s.png" % fallback)
 	if tex != null:
 		return tex
 	return _load_tex("res://assets/sprites/ui/skills/iron_tempest.png")
+
+
+static func get_slider_grabber_texture(highlighted: bool = false) -> ImageTexture:
+	var key := "__slider_grabber_hl" if highlighted else "__slider_grabber"
+	if _tex_cache.has(key):
+		return _tex_cache[key] as ImageTexture
+	const SZ := 30
+	var img := Image.create(SZ, SZ, false, Image.FORMAT_RGBA8)
+	var center := Vector2(float(SZ - 1) * 0.5, float(SZ - 1) * 0.5)
+	var outer_r := float(SZ) * 0.5 - 1.0
+	var ring_inner := outer_r - 3.2
+	var core_r := ring_inner - 1.2
+	var rim_col := Color(0.98, 0.84, 0.48, 1.0) if highlighted else Color(0.84, 0.67, 0.34, 1.0)
+	var fill_col := Color(0.18, 0.20, 0.27, 1.0) if highlighted else Color(0.10, 0.11, 0.15, 1.0)
+	var core_col := Color(0.98, 0.86, 0.54, 1.0) if highlighted else Color(0.76, 0.60, 0.30, 0.85)
+	for y in range(SZ):
+		for x in range(SZ):
+			var d := Vector2(float(x), float(y)).distance_to(center)
+			if d > outer_r + 1.0:
+				img.set_pixel(x, y, Color(0, 0, 0, 0))
+				continue
+			var alpha := clampf(outer_r + 0.6 - d, 0.0, 1.0)
+			var col := fill_col
+			if d >= ring_inner:
+				col = rim_col
+			elif d <= 4.2:
+				var ct := clampf((4.2 - d) / 1.4, 0.0, 1.0)
+				col = fill_col.lerp(core_col, ct)
+			elif d > core_r:
+				var rt := clampf((d - core_r) / maxf(0.1, ring_inner - core_r), 0.0, 1.0)
+				col = fill_col.lerp(rim_col, rt)
+			col.a *= alpha
+			img.set_pixel(x, y, col)
+	var itex := ImageTexture.create_from_image(img)
+	_tex_cache[key] = itex
+	return itex
+
+
+static func make_scrim_texture(top_to_bottom: bool = true, edge_alpha: float = 0.82, mid_alpha: float = 0.34) -> GradientTexture2D:
+	var key := "__scrim_%s_%.2f_%.2f" % ["tb" if top_to_bottom else "bt", edge_alpha, mid_alpha]
+	if _tex_cache.has(key):
+		return _tex_cache[key] as GradientTexture2D
+	var grad := Gradient.new()
+	grad.offsets = PackedFloat32Array([0.0, 0.48, 1.0])
+	if top_to_bottom:
+		grad.colors = PackedColorArray([
+			Color(0.03, 0.035, 0.05, edge_alpha),
+			Color(0.03, 0.035, 0.05, mid_alpha),
+			Color(0.03, 0.035, 0.05, 0.0),
+		])
+	else:
+		grad.colors = PackedColorArray([
+			Color(0.03, 0.035, 0.05, 0.0),
+			Color(0.03, 0.035, 0.05, mid_alpha),
+			Color(0.03, 0.035, 0.05, edge_alpha),
+		])
+	var gtex := GradientTexture2D.new()
+	gtex.gradient = grad
+	gtex.width = 4
+	gtex.height = 64
+	gtex.fill = GradientTexture2D.FILL_LINEAR
+	gtex.fill_from = Vector2(0.0, 0.0)
+	gtex.fill_to = Vector2(0.0, 1.0)
+	_tex_cache[key] = gtex
+	return gtex
 
 
 static func get_safe_margins(viewport_node: Control) -> Dictionary:
@@ -170,10 +267,22 @@ static func get_safe_margins(viewport_node: Control) -> Dictionary:
 		if r.size.x > 0.0 and r.size.y > 0.0:
 			vp_size = r.size
 
-	var is_ios := OS.get_name() == "iOS"
+	var is_mobile := OS.has_feature("ios") or OS.has_feature("mobile") or (OS.get_name() in ["iOS", "Android"])
+	var aspect := vp_size.x / maxf(1.0, vp_size.y)
+	var sim_mobile := false
+	if not is_mobile and aspect < 0.50:
+		if bool(ProjectSettings.get_setting("display/window/simulate_ios_safe_area", false)):
+			sim_mobile = true
+		else:
+			for arg in OS.get_cmdline_user_args():
+				var a := str(arg).strip_edges()
+				if a == "--sim-ios-safe-area" or a == "--ios-safe-area":
+					sim_mobile = true
+					break
+
 	var space_w := float(win_size.x)
 	var space_h := float(win_size.y)
-	if is_ios and screen_size.x > 0 and screen_size.y > 0:
+	if is_mobile and screen_size.x > 0 and screen_size.y > 0:
 		if (vp_size.y >= vp_size.x) == (screen_size.y >= screen_size.x):
 			space_w = float(screen_size.x)
 			space_h = float(screen_size.y)
@@ -191,14 +300,22 @@ static func get_safe_margins(viewport_node: Control) -> Dictionary:
 			right = maxi(0, ceili((space_w - float(safe.end.x)) * sx))
 			bottom = maxi(0, ceili((space_h - float(safe.end.y)) * sy))
 
-	if vp_size.y >= vp_size.x:
-		top = clampi(top, 40, 64) if is_ios else clampi(top, 0, 64)
-		bottom = clampi(bottom, 18, 36) if is_ios else clampi(bottom, 0, 36)
-		left = clampi(left, 0, 48)
-		right = clampi(right, 0, 48)
-	elif is_ios:
-		top = clampi(top, 0, 32)
-		bottom = clampi(bottom, 16, 28)
+	if is_mobile or sim_mobile:
+		if vp_size.y >= vp_size.x:
+			top = 96 if top == 0 else clampi(top, 88, 136)
+			bottom = 62 if bottom == 0 else clampi(bottom, 48, 84)
+			left = clampi(left, 0, 32)
+			right = clampi(right, 0, 32)
+		else:
+			top = clampi(top, 0, 36)
+			bottom = clampi(bottom, 24, 44)
+			left = clampi(left, 0, 96)
+			right = clampi(right, 0, 96)
+	else:
+		top = maxi(top, 12)
+		bottom = maxi(bottom, 12)
+		left = clampi(left, 0, 32)
+		right = clampi(right, 0, 32)
 
 	return {"top": top, "bottom": bottom, "left": left, "right": right}
 
@@ -240,22 +357,100 @@ static func make_box(
 	return sb
 
 
+static func make_glass_panel(
+	bg: Color = Color(0.048, 0.052, 0.068, 0.76),
+	top_accent: Color = Color(0.83, 0.66, 0.33, 0.42),
+	radius: int = 12,
+	pad_h: int = 12,
+	pad_v: int = 8
+) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = top_accent
+	sb.border_width_top = 1
+	sb.border_width_left = 0
+	sb.border_width_right = 0
+	sb.border_width_bottom = 0
+	sb.set_corner_radius_all(radius)
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.38)
+	sb.shadow_size = 8
+	sb.content_margin_left = float(pad_h)
+	sb.content_margin_right = float(pad_h)
+	sb.content_margin_top = float(pad_v)
+	sb.content_margin_bottom = float(pad_v)
+	return sb
+
+
+static func make_sheet_panel(pad_h: int = 14, pad_v: int = 12) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = Color(0.052, 0.056, 0.074, 0.92)
+	sb.border_color = Color(0.83, 0.66, 0.33, 0.62)
+	sb.border_width_top = 2
+	sb.border_width_left = 0
+	sb.border_width_right = 0
+	sb.border_width_bottom = 0
+	sb.corner_radius_top_left = 18
+	sb.corner_radius_top_right = 18
+	sb.corner_radius_bottom_left = 0
+	sb.corner_radius_bottom_right = 0
+	sb.shadow_color = Color(0.0, 0.0, 0.0, 0.52)
+	sb.shadow_size = 10
+	sb.content_margin_left = float(pad_h)
+	sb.content_margin_right = float(pad_h)
+	sb.content_margin_top = float(pad_v)
+	sb.content_margin_bottom = float(pad_v)
+	return sb
+
+
+static func make_pill(
+	bg: Color = Color(0.06, 0.066, 0.088, 0.82),
+	border: Color = Color(0.55, 0.44, 0.24, 0.55),
+	pad_h: int = 12,
+	pad_v: int = 6
+) -> StyleBoxFlat:
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.border_color = border
+	sb.set_border_width_all(1)
+	sb.set_corner_radius_all(18)
+	sb.content_margin_left = float(pad_h)
+	sb.content_margin_right = float(pad_h)
+	sb.content_margin_top = float(pad_v)
+	sb.content_margin_bottom = float(pad_v)
+	return sb
+
+
+static func style_slider(slider: HSlider) -> void:
+	if slider == null:
+		return
+	slider.custom_minimum_size.y = maxf(slider.custom_minimum_size.y, 38.0)
+	slider.add_theme_icon_override("grabber", get_slider_grabber_texture(false))
+	slider.add_theme_icon_override("grabber_highlight", get_slider_grabber_texture(true))
+	slider.add_theme_icon_override("grabber_disabled", get_slider_grabber_texture(false))
+	var track := make_box(Color(0.04, 0.046, 0.064, 0.94), Color(0.38, 0.33, 0.24, 0.65), 1, 5, 0, 5)
+	var fill := make_box(Color(0.78, 0.58, 0.25, 0.94), Color(0.92, 0.74, 0.38, 0.6), 0, 5, 0, 5)
+	var fill_hl := make_box(Color(0.92, 0.74, 0.38, 1.0), Color(1.0, 0.86, 0.54, 0.8), 0, 5, 0, 5)
+	slider.add_theme_stylebox_override("slider", track)
+	slider.add_theme_stylebox_override("grabber_area", fill)
+	slider.add_theme_stylebox_override("grabber_area_highlight", fill_hl)
+
+
 static func style_cta_button(btn: Button, font_px: int = 20) -> void:
 	if btn == null:
 		return
 	btn.add_theme_font_override("font", font_title())
-	btn.add_theme_font_size_override("font_size", font_px)
+	btn.add_theme_font_size_override("font_size", scaled_font_px(font_px, 1.20))
 	btn.add_theme_color_override("font_color", TEXT_PARCHMENT)
 	btn.add_theme_color_override("font_hover_color", Color.WHITE)
 	btn.add_theme_color_override("font_pressed_color", TEXT_GOLD)
-	var normal := make_box(CTA_CRIMSON, BORDER_GOLD, 2, 5, 16, 10)
-	normal.shadow_color = Color(0, 0, 0, 0.55)
-	normal.shadow_size = 5
-	var hover := make_box(CTA_CRIMSON_HOVER, BORDER_GOLD.lightened(0.18), 2, 5, 16, 10)
-	hover.shadow_color = Color(0.5, 0.1, 0.08, 0.45)
-	hover.shadow_size = 6
-	var pressed := make_box(CTA_CRIMSON_PRESS, BORDER_BRONZE, 2, 5, 16, 10)
-	var disabled := make_box(Color("#1e1618"), BORDER_SLATE, 1, 5, 16, 10)
+	var normal := make_box(CTA_CRIMSON, BORDER_GOLD, 2, 12, 18, 12)
+	normal.shadow_color = Color(0.0, 0.0, 0.0, 0.55)
+	normal.shadow_size = 8
+	var hover := make_box(CTA_CRIMSON_HOVER, BORDER_GOLD.lightened(0.18), 2, 12, 18, 12)
+	hover.shadow_color = Color(0.55, 0.14, 0.09, 0.45)
+	hover.shadow_size = 9
+	var pressed := make_box(CTA_CRIMSON_PRESS, BORDER_BRONZE, 2, 12, 18, 12)
+	var disabled := make_box(Color("#1e1618"), BORDER_SLATE, 1, 12, 18, 12)
 	btn.add_theme_stylebox_override("normal", normal)
 	btn.add_theme_stylebox_override("hover", hover)
 	btn.add_theme_stylebox_override("focus", hover)
@@ -267,29 +462,53 @@ static func style_tab_button(btn: Button, active: bool, font_px: int = 15) -> vo
 	if btn == null:
 		return
 	btn.add_theme_font_override("font", font_title())
-	btn.add_theme_font_size_override("font_size", font_px)
-	var bg := Color("#261b18") if active else BG_IRON
-	var bdr := BORDER_GOLD if active else BORDER_SLATE
+	btn.add_theme_font_size_override("font_size", scaled_font_px(font_px, 1.20))
+	var bg := Color(0.16, 0.11, 0.095, 0.92) if active else Color(0.058, 0.064, 0.084, 0.80)
+	var bdr := BORDER_GOLD if active else Color(0.32, 0.34, 0.42, 0.55)
 	var bw := 2 if active else 1
-	var sb := make_box(bg, bdr, bw, 4, 10, 6)
-	var sb_hover := make_box(bg.lightened(0.08), BORDER_GOLD, bw, 4, 10, 6)
+	var sb := make_box(bg, bdr, bw, 10, 10, 6)
+	var sb_hover := make_box(bg.lightened(0.08), BORDER_GOLD, bw, 10, 10, 6)
+	var sb_disabled := make_box(Color(0.042, 0.046, 0.058, 0.55), Color(0.20, 0.22, 0.28, 0.40), 1, 10, 10, 6)
 	btn.add_theme_stylebox_override("normal", sb)
 	btn.add_theme_stylebox_override("hover", sb_hover)
 	btn.add_theme_stylebox_override("focus", sb_hover)
 	btn.add_theme_stylebox_override("pressed", sb)
+	btn.add_theme_stylebox_override("disabled", sb_disabled)
 	btn.add_theme_color_override("font_color", TEXT_GOLD if active else TEXT_MUTED)
 	btn.add_theme_color_override("font_hover_color", TEXT_PARCHMENT)
+	btn.add_theme_color_override("font_disabled_color", Color(0.45, 0.47, 0.52, 0.65))
+
+
+static func style_pill_button(btn: Button, active: bool, font_px: int = 14) -> void:
+	if btn == null:
+		return
+	btn.add_theme_font_override("font", font_title())
+	btn.add_theme_font_size_override("font_size", scaled_font_px(font_px, 1.20))
+	var bg := Color(0.18, 0.13, 0.09, 0.92) if active else Color(0.056, 0.062, 0.084, 0.78)
+	var bdr := BORDER_GOLD if active else Color(0.42, 0.36, 0.24, 0.48)
+	var sb := make_pill(bg, bdr, 12, 6)
+	sb.set_border_width_all(2 if active else 1)
+	var sb_h := make_pill(bg.lightened(0.08), BORDER_GOLD, 12, 6)
+	sb_h.set_border_width_all(2 if active else 1)
+	var sb_d := make_pill(Color(0.04, 0.044, 0.058, 0.50), Color(0.22, 0.24, 0.28, 0.38), 12, 6)
+	btn.add_theme_stylebox_override("normal", sb)
+	btn.add_theme_stylebox_override("hover", sb_h)
+	btn.add_theme_stylebox_override("focus", sb_h)
+	btn.add_theme_stylebox_override("pressed", sb_h)
+	btn.add_theme_stylebox_override("disabled", sb_d)
+	btn.add_theme_color_override("font_color", TEXT_GOLD if active else TEXT_PARCHMENT)
+	btn.add_theme_color_override("font_hover_color", Color.WHITE)
 
 
 static func style_rarity_tile(btn: Button, rarity: GameEnums.Rarity, selected: bool, pad: int = 6) -> void:
 	if btn == null:
 		return
 	var rcol := GameEnums.rarity_color(rarity)
-	var bg := BG_ABYSS.lerp(rcol, 0.14 if selected else 0.07)
-	var bdr := BORDER_GOLD.lightened(0.22) if selected else rcol.darkened(0.15)
+	var bg := Color(0.048, 0.052, 0.070, 0.86).lerp(rcol, 0.16 if selected else 0.08)
+	var bdr := BORDER_GOLD.lightened(0.22) if selected else rcol.darkened(0.10)
 	var bw := 2 if (selected or int(rarity) >= int(GameEnums.Rarity.RARE)) else 1
-	var sb := make_box(bg, bdr, bw, 4, pad, pad)
-	var sb_h := make_box(bg.lightened(0.08), rcol.lightened(0.15), 2, 4, pad, pad)
+	var sb := make_box(bg, bdr, bw, 10, pad, pad)
+	var sb_h := make_box(bg.lightened(0.08), rcol.lightened(0.18), 2, 10, pad, pad)
 	btn.add_theme_stylebox_override("normal", sb)
 	btn.add_theme_stylebox_override("hover", sb_h)
 	btn.add_theme_stylebox_override("focus", sb_h)
@@ -300,7 +519,7 @@ static func style_label(lbl: Label, font_res: FontFile, size_px: int, col: Color
 	if lbl == null:
 		return
 	lbl.add_theme_font_override("font", font_res)
-	lbl.add_theme_font_size_override("font_size", size_px)
+	lbl.add_theme_font_size_override("font_size", scaled_font_px(size_px))
 	lbl.add_theme_color_override("font_color", col)
 	if outline > 0:
 		lbl.add_theme_constant_override("outline_size", outline)

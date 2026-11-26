@@ -181,7 +181,7 @@ void fragment() {
 		col += vec3(0.28, 0.85, 1.0) * outer_glow * 1.05;
 		col = mix(col, vec3(0.45, 0.92, 1.0), core);
 		col = mix(col, vec3(0.97, 0.99, 1.0), spine);
-	} else {
+	} else if (icon_id == 3) {
 		for (int i = 0; i < 3; i++) {
 			float fi = float(i);
 			float yo = (fi - 1.0) * 0.21;
@@ -206,6 +206,157 @@ void fragment() {
 			}
 			col += vec3(0.95, 0.68, 0.26) * rim * 0.65;
 			col = mix(col, facet, fill);
+		}
+	} else if (icon_id == 4) {
+		vec2 orig = vec2(-0.26, 0.0);
+		vec2 dp = uv - orig;
+		float dr = length(dp);
+		float flash_glow = exp(-dr * 3.8) * 0.95;
+		float star_x = exp(-abs(dp.y) * 26.0) * exp(-abs(dp.x) * 3.2);
+		float star_y = exp(-abs(dp.x) * 26.0) * exp(-abs(dp.y) * 3.2);
+		float diag1 = exp(-abs(dp.x + dp.y) * 24.0) * exp(-dr * 4.5);
+		float diag2 = exp(-abs(dp.x - dp.y) * 24.0) * exp(-dr * 4.5);
+		float ring_rift = exp(-abs(dr - 0.34) * 22.0) * smoothstep(0.15, -0.35, dp.x);
+		col += vec3(0.08, 0.44, 0.98) * (flash_glow * 0.85 + ring_rift * 0.65);
+		col += vec3(0.45, 0.88, 1.0) * (star_x + star_y) * 0.85;
+		col += vec3(0.65, 0.94, 1.0) * (diag1 + diag2) * 0.55;
+		col += vec3(0.95, 0.99, 1.0) * exp(-dr * 14.0) * 0.95;
+
+		for (int i = 0; i < 6; i++) {
+			float fi = float(i);
+			float yo = (fi - 2.5) * 0.17;
+			float xo = -0.58 + fract(fi * 0.37) * 0.24;
+			float d_cinder = sd_tri_seg(uv, vec2(xo, yo), vec2(xo + 0.24, yo * 0.82), 0.004, 0.018);
+			col += vec3(0.28, 0.78, 1.0) * exp(-max(d_cinder, 0.0) * 28.0) * 0.78;
+			col += vec3(0.85, 0.97, 1.0) * exp(-length(uv - vec2(xo + 0.04, yo)) * 34.0) * 0.65;
+		}
+
+		for (int c = 0; c < 2; c++) {
+			float ox = (c == 0) ? -0.06 : 0.28;
+			float sc = (c == 0) ? 0.84 : 1.04;
+			vec2 q = uv - vec2(ox, 0.0);
+			float ax = abs(q.y);
+			float x_edge = 0.24 * sc - ax * 1.22;
+			float d_chev = max(max(q.x - x_edge, (x_edge - 0.14 * sc) - q.x), ax - 0.35 * sc);
+			float fill = 1.0 - smoothstep(-0.010, 0.010, d_chev);
+			float rim = exp(-max(d_chev, 0.0) * 24.0);
+			if (c == 0) {
+				col += vec3(0.18, 0.68, 1.0) * rim * 0.85;
+				col = mix(col, vec3(0.26, 0.72, 0.98), fill * 0.52);
+			} else {
+				vec3 facet = (q.y < 0.0) ? vec3(0.76, 0.95, 1.0) : vec3(0.22, 0.56, 0.92);
+				float ridge = 1.0 - smoothstep(0.0, 0.040, abs(q.x - (x_edge - 0.07 * sc)));
+				facet = mix(facet, vec3(0.96, 0.99, 1.0), ridge * 0.82);
+				col += vec3(0.25, 0.80, 1.0) * rim * 0.92;
+				col = mix(col, facet, fill);
+			}
+		}
+	} else if (icon_id == 5) {
+		vec2 ap = uv - vec2(-0.04, 0.02);
+		float d_arc = sd_crescent(ap, 0.50, 0.145, -1.85, 1.75);
+		float arc_aura = exp(-max(d_arc, 0.0) * 11.0);
+		float arc_rim = exp(-max(d_arc, 0.0) * 30.0);
+		float arc_fill = 1.0 - smoothstep(-0.010, 0.010, d_arc);
+		col += vec3(0.86, 0.10, 0.14) * arc_aura * 0.78;
+
+		float ar = length(ap);
+		float fuller = 1.0 - smoothstep(0.016, 0.062, abs(ar - 0.48));
+		float outer_edge = smoothstep(0.54, 0.63, ar) * arc_fill;
+		float inner_crim = smoothstep(0.42, 0.36, ar) * arc_fill;
+		float spec = clamp(0.45 + 0.55 * (-ap.x * 0.55 - ap.y * 0.75), 0.16, 1.0);
+		vec3 steel = mix(vec3(0.22, 0.24, 0.30), vec3(0.78, 0.82, 0.88), spec);
+		steel = mix(steel, vec3(0.12, 0.13, 0.18), fuller * 0.58);
+		steel = mix(steel, vec3(0.96, 0.18, 0.22), inner_crim * 0.68);
+		steel = mix(steel, vec3(1.0, 0.94, 0.94), outer_edge * 0.90);
+		col = mix(col, steel, arc_fill);
+		col += vec3(1.0, 0.16, 0.20) * arc_rim * 0.88;
+
+		float d_shaft = sd_tri_seg(uv, vec2(-0.56, 0.54), vec2(0.22, -0.24), 0.030, 0.024);
+		float d_spike = sd_tri_seg(uv, vec2(0.18, -0.20), vec2(0.38, -0.40), 0.032, 0.004);
+		float d_beak = sd_tri_seg(uv, vec2(0.06, -0.08), vec2(-0.14, -0.28), 0.034, 0.006);
+		float shaft_m = 1.0 - smoothstep(-0.008, 0.010, d_shaft);
+		float head_m = 1.0 - smoothstep(-0.008, 0.010, min(d_spike, d_beak));
+		col = mix(col, vec3(0.18, 0.14, 0.12), shaft_m);
+		col = mix(col, vec3(0.76, 0.79, 0.86), head_m);
+		float d_collar = sd_seg(uv, vec2(0.02, -0.04), vec2(0.10, -0.12)) - 0.038;
+		col = mix(col, vec3(0.84, 0.64, 0.28), 1.0 - smoothstep(-0.008, 0.008, d_collar));
+
+		for (int i = 0; i < 6; i++) {
+			float fi = float(i);
+			float ang = -1.45 + fi * 0.56;
+			vec2 sp = vec2(-0.04, 0.02) + vec2(cos(ang), sin(ang)) * (0.64 + 0.08 * fract(fi * 0.43));
+			col += vec3(1.0, 0.22, 0.24) * exp(-length(uv - sp) * 32.0) * 0.95;
+		}
+	} else if (icon_id == 6) {
+		vec2 origin = vec2(-0.48, 0.46);
+		col += vec3(0.78, 0.08, 0.14) * exp(-length(uv - origin) * 3.8) * 0.72;
+
+		for (int i = 0; i < 5; i++) {
+			float fi = float(i) - 2.0;
+			float ang = -0.7854 + fi * 0.245;
+			vec2 dir = vec2(cos(ang), sin(ang));
+			float len = 1.06 - abs(fi) * 0.08;
+			vec2 p_tail = origin + dir * 0.14;
+			vec2 p_neck = origin + dir * (len - 0.28);
+			vec2 p_tip = origin + dir * len;
+
+			float d_shaft = sd_tri_seg(uv, p_tail, p_neck, 0.005, 0.015);
+			float d_blade_a = sd_tri_seg(uv, p_neck, p_neck + dir * 0.07, 0.014, 0.042);
+			float d_blade_b = sd_tri_seg(uv, p_neck + dir * 0.07, p_tip, 0.042, 0.003);
+			float d_lance = min(d_shaft, min(d_blade_a, d_blade_b));
+
+			float corona = exp(-max(d_lance, 0.0) * 14.0);
+			float glow = exp(-max(d_lance, 0.0) * 32.0);
+			float fill = 1.0 - smoothstep(-0.008, 0.008, d_lance);
+			float spine = 1.0 - smoothstep(-0.016, 0.004, sd_tri_seg(uv, p_tail + dir * 0.08, p_tip, 0.003, 0.010));
+			float boost = 1.0 - abs(fi) * 0.08;
+
+			col += vec3(0.86, 0.08, 0.16) * corona * 0.56 * boost;
+			col += vec3(1.0, 0.30, 0.36) * glow * 0.65 * boost;
+			col = mix(col, vec3(0.95, 0.42, 0.48), fill * 0.92);
+			col = mix(col, vec3(1.0, 0.94, 0.95), spine * 0.94);
+		}
+		col += vec3(1.0, 0.50, 0.52) * exp(-length(uv - origin) * 12.0) * 0.70;
+	} else {
+		float smoke_n = fbm(vec2(uv.x * 4.0 + 2.3, uv.y * 5.2 + 0.9));
+		float wake_band = smoothstep(0.45, -0.58, uv.x) * exp(-abs(uv.y + (smoke_n - 0.5) * 0.32) * 3.4);
+		float wake_edge = wake_band * smoothstep(0.32, 0.68, smoke_n);
+		col = mix(col, vec3(0.04, 0.025, 0.045), wake_edge * 0.72);
+		col += vec3(0.82, 0.10, 0.16) * wake_edge * 0.78;
+
+		for (int i = 0; i < 3; i++) {
+			float fi = float(i);
+			float yo = (fi - 1.0) * 0.22;
+			float d_wisp = sd_tri_seg(uv, vec2(-0.68, yo * 1.15), vec2(-0.08 + fi * 0.03, yo * 0.72), 0.006, 0.026);
+			col += vec3(0.86, 0.10, 0.18) * exp(-max(d_wisp, 0.0) * 20.0) * 0.85;
+			col += vec3(1.0, 0.52, 0.48) * exp(-max(d_wisp, 0.0) * 36.0) * 0.42;
+		}
+
+		for (int c = 0; c < 2; c++) {
+			float ox = (c == 0) ? -0.18 : 0.22;
+			float sc = (c == 0) ? 0.88 : 1.08;
+			vec2 q = uv - vec2(ox, 0.0);
+			float ax = abs(q.y);
+			float x_edge = 0.28 * sc - ax * 1.12;
+			float d_chev = max(max(q.x - x_edge, (x_edge - 0.16 * sc) - q.x), ax - 0.38 * sc);
+			float fill = 1.0 - smoothstep(-0.010, 0.010, d_chev);
+			float rim = exp(-max(d_chev, 0.0) * 24.0);
+			if (c == 0) {
+				col += vec3(0.84, 0.10, 0.18) * rim * 0.82;
+				col = mix(col, vec3(0.11, 0.05, 0.08), fill * 0.85);
+			} else {
+				vec3 facet = (q.y < 0.0) ? vec3(0.28, 0.16, 0.22) : vec3(0.10, 0.08, 0.12);
+				float ridge = 1.0 - smoothstep(0.0, 0.042, abs(q.x - (x_edge - 0.06 * sc)));
+				facet = mix(facet, vec3(1.0, 0.26, 0.28), ridge * 0.92);
+				col += vec3(1.0, 0.16, 0.22) * rim * 0.95;
+				col = mix(col, facet, fill);
+			}
+		}
+
+		for (int i = 0; i < 5; i++) {
+			float fi = float(i);
+			vec2 ep = vec2(-0.56 + fi * 0.14, sin(fi * 2.4) * 0.34);
+			col += vec3(1.0, 0.34, 0.26) * exp(-length(uv - ep) * 32.0) * 0.85;
 		}
 	}
 
@@ -235,32 +386,38 @@ const HERO_SPECS := [
 		"lantern": Color(1.0, 0.68, 0.22),
 		"cam_pos": Vector3(-0.62, 1.62, -2.26),
 		"look_at": Vector3(0.0, 1.48, 0.0),
+		"dist_mult": 1.00,
+		"look_y": 0.77,
 		"fov": 29.0,
 		"rim_col": Color(1.0, 0.56, 0.20),
 	},
 	{
 		"id": "battlemage",
 		"scene": "res://scenes/actors/heroes/battlemage.tscn",
-		"tier": 2,
+		"tier": 1,
 		"wpn": "runed_staff",
 		"off": "",
 		"plume": false,
-		"lantern": Color(0.32, 0.74, 1.0),
-		"cam_pos": Vector3(-0.34, 1.66, -2.62),
-		"look_at": Vector3(0.26, 1.56, -0.22),
+		"lantern": Color(0.26, 0.68, 1.0),
+		"cam_pos": Vector3(-0.52, 1.50, -2.28),
+		"look_at": Vector3(0.0, 1.40, 0.0),
+		"dist_mult": 1.06,
+		"look_y": 0.72,
 		"fov": 29.0,
 		"rim_col": Color(0.35, 0.75, 1.0),
 	},
 	{
 		"id": "revenant",
 		"scene": "res://scenes/actors/heroes/revenant.tscn",
-		"tier": 4,
+		"tier": 1,
 		"wpn": "halberd",
 		"off": "",
-		"plume": true,
-		"lantern": Color(0.96, 0.22, 0.28),
-		"cam_pos": Vector3(-0.62, 1.68, -2.64),
-		"look_at": Vector3(0.08, 1.54, 0.0),
+		"plume": false,
+		"lantern": Color(0.95, 0.22, 0.24),
+		"cam_pos": Vector3(-0.58, 1.52, -2.54),
+		"look_at": Vector3(0.0, 1.40, 0.0),
+		"dist_mult": 1.18,
+		"look_y": 0.72,
 		"fov": 30.0,
 		"rim_col": Color(0.95, 0.28, 0.32),
 	},
@@ -288,11 +445,11 @@ const ENEMY_SPECS := [
 	{
 		"id": "ash_scorpion",
 		"scene": "res://scenes/actors/enemies/ash_scorpion.tscn",
-		"cam_rel": Vector3(-0.52, 0.68, -0.92),
-		"look_y": 0.46,
-		"dist_mult": 1.55,
+		"cam_rel": Vector3(-0.46, 0.96, -1.04),
+		"look_y": 0.44,
+		"dist_mult": 1.58,
 		"fov": 32.0,
-		"rim_col": Color(1.0, 0.48, 0.16),
+		"rim_col": Color(1.0, 0.45, 0.14),
 	},
 	{
 		"id": "stone_gargoyle",
@@ -307,8 +464,8 @@ const ENEMY_SPECS := [
 		"id": "dread_golem",
 		"scene": "res://scenes/actors/enemies/dread_golem.tscn",
 		"cam_rel": Vector3(-0.36, 0.74, -0.96),
-		"look_y": 0.68,
-		"dist_mult": 1.18,
+		"look_y": 0.70,
+		"dist_mult": 1.14,
 		"fov": 30.0,
 		"rim_col": Color(1.0, 0.52, 0.16),
 	},
@@ -317,9 +474,9 @@ const ENEMY_SPECS := [
 		"scene": "res://scenes/actors/enemies/infernal_minotaur.tscn",
 		"cam_rel": Vector3(-0.34, 0.80, -0.96),
 		"look_y": 0.74,
-		"dist_mult": 1.16,
+		"dist_mult": 1.26,
 		"fov": 30.0,
-		"rim_col": Color(1.0, 0.34, 0.12),
+		"rim_col": Color(1.0, 0.42, 0.10),
 	},
 	{
 		"id": "barrow_troll",
@@ -334,10 +491,10 @@ const ENEMY_SPECS := [
 		"id": "blight_werewolf",
 		"scene": "res://scenes/actors/enemies/blight_werewolf.tscn",
 		"cam_rel": Vector3(-0.36, 0.80, -0.96),
-		"look_y": 0.74,
-		"dist_mult": 1.04,
+		"look_y": 0.72,
+		"dist_mult": 1.12,
 		"fov": 30.0,
-		"rim_col": Color(0.52, 0.96, 0.28),
+		"rim_col": Color(0.22, 0.56, 0.20),
 	},
 ]
 
@@ -346,6 +503,10 @@ const SKILL_KEYS := [
 	{"id": "blackflame_pyre", "shader_id": 1},
 	{"id": "stormbrand_arc", "shader_id": 2},
 	{"id": "iron_roll", "shader_id": 3},
+	{"id": "phase_blink", "shader_id": 4},
+	{"id": "reaping_sweep", "shader_id": 5},
+	{"id": "wraith_lances", "shader_id": 6},
+	{"id": "shadow_step", "shader_id": 7},
 ]
 
 const ITEM_KEYS := [
@@ -567,16 +728,14 @@ func _get_actor_bone_world(actor: ActorVisual, bone_name: String, fallback: Vect
 
 
 func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
-	var is_oath := str(spec["id"]) == "oathbreaker"
-	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.095), spec["rim_col"] as Color, 2.05 if is_oath else 2.55)
-	if is_oath:
-		for ch in (st["vp"] as SubViewport).get_children():
-			if ch is WorldEnvironment:
-				var env := (ch as WorldEnvironment).environment
-				if env != null:
-					env.glow_intensity = 0.28
-					env.glow_bloom = 0.05
-					env.glow_hdr_threshold = 1.2
+	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.095), spec["rim_col"] as Color, 2.05)
+	for ch in (st["vp"] as SubViewport).get_children():
+		if ch is WorldEnvironment:
+			var env := (ch as WorldEnvironment).environment
+			if env != null:
+				env.glow_intensity = 0.28
+				env.glow_bloom = 0.05
+				env.glow_hdr_threshold = 1.2
 	var ps := load(str(spec["scene"])) as PackedScene
 	var actor := ps.instantiate() as ActorVisual
 	(st["vp"] as SubViewport).add_child(actor)
@@ -597,16 +756,21 @@ func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
 	var cam: Camera3D = st["cam"]
 	cam.fov = float(spec["fov"])
 	if actor.is_unified_kit():
-		var chest_p := _get_actor_bone_world(actor, "chest", Vector3(0.0, 1.32, 0.0))
-		var head_p := _get_actor_bone_world(actor, "head", Vector3(0.0, 1.66, 0.0))
-		var focus := chest_p.lerp(head_p, 0.56)
+		var h := maxf(1.2, actor.height_meters)
+		var chest_p := _get_actor_bone_world(actor, "chest", Vector3(0.0, h * 0.64, 0.0))
+		var head_p := _get_actor_bone_world(actor, "head", Vector3(0.0, h * 0.84, 0.0))
+		var anchor := chest_p.lerp(head_p, 0.56)
+		var look_y_val := float(spec.get("look_y", 0.76))
+		var dist_mult := float(spec.get("dist_mult", 1.0))
+		var look_target := Vector3(anchor.x, h * look_y_val, anchor.z)
 		var fill_warm := OmniLight3D.new()
 		fill_warm.light_color = Color(1.0, 0.68, 0.34)
-		fill_warm.light_energy = 1.10 if is_oath else 1.65
+		fill_warm.light_energy = 1.15
 		fill_warm.omni_range = 5.0
-		fill_warm.position = focus + Vector3(0.85, 0.25, -1.15)
+		fill_warm.position = look_target + Vector3(0.85, 0.25, -1.15)
 		(st["vp"] as SubViewport).add_child(fill_warm)
-		cam.look_at_from_position(focus + Vector3(-0.48, 0.08, -2.14), focus + Vector3(0.0, 0.06, 0.0), Vector3.UP)
+		var cam_offset := Vector3(-0.48, 0.02, -2.14) * dist_mult
+		cam.look_at_from_position(look_target + cam_offset, look_target, Vector3.UP)
 	else:
 		cam.look_at_from_position(spec["cam_pos"] as Vector3, spec["look_at"] as Vector3, Vector3.UP)
 	st["id"] = str(spec["id"])
@@ -630,7 +794,8 @@ func _build_enemy_portrait_stage(spec: Dictionary) -> Dictionary:
 	if actor.is_unified_kit():
 		var chest_p := _get_actor_bone_world(actor, "chest", Vector3(0.0, h * 0.64, 0.0))
 		var head_p := _get_actor_bone_world(actor, "head", Vector3(0.0, h * 0.84, 0.0))
-		var look_target := chest_p.lerp(head_p, 0.60)
+		var anchor := chest_p.lerp(head_p, 0.60)
+		var look_target := Vector3(anchor.x, h * float(spec["look_y"]), anchor.z)
 		var dist := h * 0.96 * float(spec["dist_mult"])
 		var rel: Vector3 = spec["cam_rel"]
 		var cam_pos := look_target + Vector3(rel.x * dist, (rel.y - 0.78) * dist * 0.5, rel.z * dist)

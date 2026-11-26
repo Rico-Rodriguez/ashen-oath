@@ -1,17 +1,15 @@
-[gd_scene load_steps=5 format=3]
+[gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
-[ext_resource type="PackedScene" path="res://assets/models/monsters_dark/minotaur.glb" id="2"]
-[ext_resource type="AnimationLibrary" path="res://assets/models/monsters_dark/monster_humanoid_anims.res" id="3"]
-[ext_resource type="Texture2D" path="res://assets/models/monsters_dark/minotaur_albedo.png" id="4"]
+[ext_resource type="PackedScene" path="res://assets/models/kit/khorvath_boss.glb" id="2"]
 
 [node name="InfernalMinotaur" type="Node3D"]
 script = ExtResource("1")
 actor_id = "infernal_minotaur"
-height_meters = 2.3
+height_meters = 3.10
 yaw_offset_deg = 180.0
-anim_library_override = ExtResource("3")
-albedo_override = ExtResource("4")
+emission_tint = Color(1, 0.42, 0.10, 1)
+emission_energy = 2.2
 
 [node name="ModelPivot" type="Node3D" parent="."]
 

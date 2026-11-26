@@ -1,34 +1,42 @@
 class_name HuntTab
-extends MarginContainer
+extends Control
 
 signal embark_requested(class_id: String, zone_id: String, difficulty: int)
 
-const ACTIVE_SLICE_CLASS := "oathbreaker"
-
-@onready var stage_3d: SanctuaryStage3D = $VBox/StageFrame/SanctuaryStage3D
-@onready var hero_plaque: PanelContainer = $VBox/StageFrame/HeroPlaque
-@onready var hero_name_lbl: Label = $VBox/StageFrame/HeroPlaque/PlaqueVBox/HeroNameLbl
-@onready var hero_sub_lbl: Label = $VBox/StageFrame/HeroPlaque/PlaqueVBox/HeroSubLbl
-@onready var hero_Cards_row: HBoxContainer = $VBox/HeroCardsRow
-@onready var skill_row: GridContainer = $VBox/SkillRow
-@onready var zones_vbox: VBoxContainer = $VBox/ZonesVBox
-@onready var diff_row: HBoxContainer = $VBox/DiffRow
-@onready var embark_btn: Button = $VBox/EmbarkBtn
+@onready var stage_3d: SanctuaryStage3D = $SanctuaryStage3D
+@onready var bottom_scrim: TextureRect = $BottomScrim
+@onready var safe_overlay: MarginContainer = $SafeOverlay
+@onready var hero_name_lbl: Label = $SafeOverlay/OverlayVBox/HeroPlaqueVBox/HeroNameLbl
+@onready var hero_sub_lbl: Label = $SafeOverlay/OverlayVBox/HeroPlaqueVBox/HeroSubLbl
+@onready var skill_badges_row: HBoxContainer = $SafeOverlay/OverlayVBox/HeroPlaqueVBox/SkillBadgesCenter/SkillBadgesRow
+@onready var skill_tooltip_panel: PanelContainer = $SafeOverlay/OverlayVBox/HeroPlaqueVBox/SkillTooltipPanel
+@onready var skill_tooltip_lbl: Label = $SafeOverlay/OverlayVBox/HeroPlaqueVBox/SkillTooltipPanel/SkillTooltipLbl
+@onready var lower_dock: PanelContainer = $SafeOverlay/OverlayVBox/LowerDock
+@onready var hero_cards_row: HBoxContainer = $SafeOverlay/OverlayVBox/LowerDock/DockVBox/HeroCardsRow
+@onready var zones_vbox: VBoxContainer = $SafeOverlay/OverlayVBox/LowerDock/DockVBox/ZonesVBox
+@onready var diff_row: HBoxContainer = $SafeOverlay/OverlayVBox/LowerDock/DockVBox/DiffRow
+@onready var embark_btn: Button = $SafeOverlay/OverlayVBox/LowerDock/DockVBox/EmbarkBtn
 
 var _hero_card_btns: Dictionary = {}
 var _zone_tab_btns: Dictionary = {}
 var _featured_zone_widgets: Dictionary = {}
 var _diff_btns: Dictionary = {}
+var _skill_badge_btns: Dictionary = {}
+var _active_tooltip_ab_id: String = ""
+var _last_skill_class_id: String = ""
 
 
 func _ready() -> void:
-	hero_plaque.add_theme_stylebox_override(
+	stage_3d.set_stage_mode("sanctum")
+	bottom_scrim.texture = UiThemeBuilder.make_scrim_texture(false, 0.88, 0.36)
+	lower_dock.add_theme_stylebox_override(
 		"panel",
-		UiThemeBuilder.make_box(Color(0.05, 0.055, 0.075, 0.86), UiThemeBuilder.BORDER_BRONZE, 1, 4, 12, 6)
+		UiThemeBuilder.make_glass_panel(Color(0.044, 0.048, 0.066, 0.80), Color(0.83, 0.66, 0.33, 0.48), 16, 12, 10)
 	)
-	UiThemeBuilder.style_label(hero_name_lbl, UiThemeBuilder.font_title(), 16, UiThemeBuilder.TEXT_GOLD)
-	UiThemeBuilder.style_label(hero_sub_lbl, UiThemeBuilder.font_body(), 12, UiThemeBuilder.TEXT_PARCHMENT)
-	UiThemeBuilder.style_cta_button(embark_btn, 21)
+	skill_tooltip_panel.add_theme_stylebox_override(
+		"panel",
+		UiThemeBuilder.make_pill(Color(0.042, 0.046, 0.064, 0.90), UiThemeBuilder.BORDER_GOLD, 14, 6)
+	)
 
 	_build_hero_cards()
 	_build_zone_cards()
@@ -38,43 +46,51 @@ func _ready() -> void:
 
 	var gs := _game_state()
 	if gs != null:
-		if str(gs.get("selected_class_id")) != ACTIVE_SLICE_CLASS and gs.has_method("select_class"):
-			gs.call("select_class", ACTIVE_SLICE_CLASS)
 		if not gs.profile_changed.is_connected(refresh_ui):
 			gs.profile_changed.connect(refresh_ui)
 
 	refresh_ui()
 
 
+func apply_chrome_insets(insets: Dictionary) -> void:
+	var top_px := int(insets.get("top", 88))
+	var bot_px := int(insets.get("bottom", 96))
+	var left_px := int(insets.get("left", 0))
+	var right_px := int(insets.get("right", 0))
+	safe_overlay.add_theme_constant_override("margin_top", top_px + 4)
+	safe_overlay.add_theme_constant_override("margin_bottom", bot_px + 10)
+	safe_overlay.add_theme_constant_override("margin_left", 14 + left_px)
+	safe_overlay.add_theme_constant_override("margin_right", 14 + right_px)
+
+
+func _selected_class_id(gs: Node) -> String:
+	var cid := str(gs.get("selected_class_id")) if gs != null else "oathbreaker"
+	return cid if GameRegistry.get_class_def(cid) != null else "oathbreaker"
+
+
 func _build_hero_cards() -> void:
-	for ch in hero_Cards_row.get_children():
+	for ch in hero_cards_row.get_children():
 		ch.queue_free()
 	_hero_card_btns.clear()
 
 	var short_names := {
 		"oathbreaker": "Oathbreaker",
-		"battlemage": "Ashen Battlemage",
-		"revenant": "Dread Revenant",
-	}
-	var forge_icons := {
-		"battlemage": "runed_staff",
-		"revenant": "halberd",
+		"battlemage": "Battlemage",
+		"revenant": "Revenant",
 	}
 
 	for hdef in GameRegistry.get_all_classes():
-		var is_playable := (hdef.class_id == ACTIVE_SLICE_CLASS)
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 68)
+		btn.custom_minimum_size = Vector2(0, 78)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		btn.size_flags_stretch_ratio = 1.55 if is_playable else 1.0
 		btn.pressed.connect(_on_hero_card_pressed.bind(hdef.class_id))
 
 		var margin := MarginContainer.new()
 		margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-		margin.add_theme_constant_override("margin_left", 7)
-		margin.add_theme_constant_override("margin_right", 7)
-		margin.add_theme_constant_override("margin_top", 5)
-		margin.add_theme_constant_override("margin_bottom", 5)
+		margin.add_theme_constant_override("margin_left", 8)
+		margin.add_theme_constant_override("margin_right", 8)
+		margin.add_theme_constant_override("margin_top", 6)
+		margin.add_theme_constant_override("margin_bottom", 6)
 		margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		btn.add_child(margin)
 
@@ -84,20 +100,14 @@ func _build_hero_cards() -> void:
 		margin.add_child(hbox)
 
 		var pframe := PanelContainer.new()
-		pframe.custom_minimum_size = Vector2(54, 54)
+		pframe.custom_minimum_size = Vector2(58, 58)
 		pframe.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		pframe.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_BRONZE, 1, 4, 2, 2))
 		pframe.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.add_child(pframe)
 
 		var tex := TextureRect.new()
-		if is_playable:
-			tex.texture = UiThemeBuilder.get_portrait(hdef.class_id)
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-		else:
-			tex.texture = UiThemeBuilder.get_item_icon_by_key(str(forge_icons.get(hdef.class_id, "halberd")))
-			tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-			tex.modulate = Color(0.55, 0.56, 0.64, 0.78)
+		tex.texture = UiThemeBuilder.get_portrait(hdef.class_id)
+		tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		pframe.add_child(tex)
@@ -105,33 +115,29 @@ func _build_hero_cards() -> void:
 		var vbox := VBoxContainer.new()
 		vbox.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		vbox.alignment = BoxContainer.ALIGNMENT_CENTER
-		vbox.add_theme_constant_override("separation", 1)
+		vbox.add_theme_constant_override("separation", 2)
 		vbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		hbox.add_child(vbox)
 
 		var nlbl := Label.new()
-		nlbl.name = "NameLbl"
 		nlbl.text = str(short_names.get(hdef.class_id, hdef.display_name))
 		nlbl.clip_text = true
-		UiThemeBuilder.style_label(nlbl, UiThemeBuilder.font_title(), 13 if is_playable else 11, UiThemeBuilder.TEXT_GOLD if is_playable else UiThemeBuilder.TEXT_MUTED)
 		nlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		vbox.add_child(nlbl)
 
 		var rlbl := Label.new()
-		rlbl.text = hdef.subtitle if is_playable else "IN THE FORGE"
+		rlbl.text = hdef.subtitle
 		rlbl.clip_text = true
-		UiThemeBuilder.style_label(
-			rlbl,
-			UiThemeBuilder.font_title() if not is_playable else UiThemeBuilder.font_body(),
-			10 if not is_playable else 12,
-			UiThemeBuilder.BORDER_GOLD if not is_playable else UiThemeBuilder.TEXT_PARCHMENT,
-			1
-		)
 		rlbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
 		vbox.add_child(rlbl)
 
-		hero_Cards_row.add_child(btn)
-		_hero_card_btns[hdef.class_id] = {"btn": btn, "name_lbl": nlbl, "frame": pframe, "playable": is_playable}
+		hero_cards_row.add_child(btn)
+		_hero_card_btns[hdef.class_id] = {
+			"btn": btn,
+			"name_lbl": nlbl,
+			"sub_lbl": rlbl,
+			"frame": pframe,
+		}
 
 
 func _build_zone_cards() -> void:
@@ -147,94 +153,81 @@ func _build_zone_cards() -> void:
 	var roman := ["I", "II", "III", "IV"]
 	for zdef in GameRegistry.get_all_zones():
 		var tbtn := Button.new()
-		tbtn.custom_minimum_size = Vector2(0, 38)
+		tbtn.custom_minimum_size = Vector2(0, 56)
 		tbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		var idx := clampi(zdef.depth_index, 0, roman.size() - 1)
-		tbtn.text = "%s · %s" % [roman[idx], zdef.display_name.get_slice(" ", 0).to_upper()]
-		if zdef.zone_id == "fringe":
-			tbtn.text = "I · FRINGE"
+		tbtn.text = "%s · %s" % [roman[idx], _zone_short_name(zdef)]
 		tbtn.pressed.connect(_on_zone_pressed.bind(zdef.zone_id))
 		tabs_row.add_child(tbtn)
 		_zone_tab_btns[zdef.zone_id] = {"btn": tbtn, "zdef": zdef}
 
-	var feat_btn := Button.new()
-	feat_btn.custom_minimum_size = Vector2(0, 72)
-	feat_btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	feat_btn.disabled = false
-	feat_btn.mouse_filter = Control.MOUSE_FILTER_IGNORE
-
-	var margin := MarginContainer.new()
-	margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 9)
-	margin.add_theme_constant_override("margin_right", 10)
-	margin.add_theme_constant_override("margin_top", 6)
-	margin.add_theme_constant_override("margin_bottom", 6)
-	margin.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	feat_btn.add_child(margin)
+	var summary_panel := PanelContainer.new()
+	summary_panel.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	summary_panel.add_theme_stylebox_override(
+		"panel",
+		UiThemeBuilder.make_glass_panel(Color(0.042, 0.046, 0.064, 0.78), Color(0.83, 0.66, 0.33, 0.42), 12, 10, 8)
+	)
+	zones_vbox.add_child(summary_panel)
 
 	var hbox := HBoxContainer.new()
 	hbox.add_theme_constant_override("separation", 10)
-	hbox.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	margin.add_child(hbox)
+	summary_panel.add_child(hbox)
 
 	var bframe := PanelContainer.new()
-	bframe.custom_minimum_size = Vector2(56, 56)
+	bframe.custom_minimum_size = Vector2(52, 52)
 	bframe.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	bframe.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_GOLD, 1, 4, 2, 2))
-	bframe.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	bframe.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_GOLD, 1, 8, 2, 2))
 	hbox.add_child(bframe)
 
 	var btex := TextureRect.new()
 	btex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 	btex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
-	btex.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	bframe.add_child(btex)
 
 	var mid := VBoxContainer.new()
 	mid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	mid.alignment = BoxContainer.ALIGNMENT_CENTER
 	mid.add_theme_constant_override("separation", 2)
-	mid.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	hbox.add_child(mid)
 
 	var ztitle := Label.new()
-	UiThemeBuilder.style_label(ztitle, UiThemeBuilder.font_title(), 15, UiThemeBuilder.TEXT_GOLD)
-	ztitle.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	ztitle.clip_text = true
 	mid.add_child(ztitle)
 
 	var zsub := Label.new()
 	zsub.clip_text = true
-	UiThemeBuilder.style_label(zsub, UiThemeBuilder.font_body(), 13, UiThemeBuilder.TEXT_PARCHMENT, 1)
-	zsub.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	mid.add_child(zsub)
 
-	var right := VBoxContainer.new()
-	right.alignment = BoxContainer.ALIGNMENT_CENTER
-	right.add_theme_constant_override("separation", 2)
-	right.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	hbox.add_child(right)
-
-	var status_lbl := Label.new()
-	status_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	UiThemeBuilder.style_label(status_lbl, UiThemeBuilder.font_title(), 11, UiThemeBuilder.TEXT_GOLD)
-	status_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.add_child(status_lbl)
+	var pwr_badge := PanelContainer.new()
+	pwr_badge.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	hbox.add_child(pwr_badge)
 
 	var pwr_lbl := Label.new()
-	pwr_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
-	UiThemeBuilder.style_label(pwr_lbl, UiThemeBuilder.font_bold(), 13, UiThemeBuilder.TEXT_PARCHMENT, 1)
-	pwr_lbl.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	right.add_child(pwr_lbl)
+	pwr_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	pwr_badge.add_child(pwr_lbl)
 
-	zones_vbox.add_child(feat_btn)
 	_featured_zone_widgets = {
-		"btn": feat_btn,
+		"panel": summary_panel,
 		"btex": btex,
 		"title": ztitle,
 		"sub": zsub,
-		"status": status_lbl,
+		"pwr_badge": pwr_badge,
 		"pwr": pwr_lbl,
 	}
+
+
+static func _zone_short_name(zdef: ZoneDef) -> String:
+	match zdef.zone_id:
+		"fringe":
+			return "FRINGE"
+		"weald":
+			return "WEALD"
+		"catacombs":
+			return "CATACOMBS"
+		"rift":
+			return "RIFT"
+		_:
+			return zdef.display_name.get_slice(" ", 0).to_upper()
 
 
 func _build_difficulty_buttons() -> void:
@@ -243,14 +236,14 @@ func _build_difficulty_buttons() -> void:
 	_diff_btns.clear()
 
 	var specs := [
-		{"diff": GameEnums.Difficulty.NORMAL, "label": "NORMAL\n1.0x Gold"},
-		{"diff": GameEnums.Difficulty.VETERAN, "label": "VETERAN\n1.35x Gold · +1 Roll"},
-		{"diff": GameEnums.Difficulty.NIGHTMARE, "label": "NIGHTMARE\n1.75x Gold · +2 Rolls"},
+		{"diff": GameEnums.Difficulty.NORMAL, "label": "NORMAL · 1.0x"},
+		{"diff": GameEnums.Difficulty.VETERAN, "label": "VETERAN · 1.35x"},
+		{"diff": GameEnums.Difficulty.NIGHTMARE, "label": "NIGHTMARE · 1.75x"},
 	]
 	for sp in specs:
 		var d: GameEnums.Difficulty = sp["diff"]
 		var btn := Button.new()
-		btn.custom_minimum_size = Vector2(0, 48)
+		btn.custom_minimum_size = Vector2(0, 52)
 		btn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		btn.text = str(sp["label"])
 		btn.alignment = HORIZONTAL_ALIGNMENT_CENTER
@@ -261,14 +254,19 @@ func _build_difficulty_buttons() -> void:
 
 func refresh_ui() -> void:
 	var gs := _game_state()
-	var cid := ACTIVE_SLICE_CLASS
+	var cid := _selected_class_id(gs)
 	var zid := str(gs.get("selected_zone_id")) if gs != null else "fringe"
 	var diff := int(gs.get("selected_difficulty")) if gs != null else int(GameEnums.Difficulty.NORMAL)
 	var hero_pwr := int(gs.call("get_class_power_score", cid)) if gs != null and gs.has_method("get_class_power_score") else 140
 
 	var hdef := GameRegistry.get_class_def(cid)
 	if hdef == null:
-		hdef = GameRegistry.get_class_def(ACTIVE_SLICE_CLASS)
+		hdef = GameRegistry.get_class_def("oathbreaker")
+
+	UiThemeBuilder.style_label(hero_name_lbl, UiThemeBuilder.font_title(), 26, UiThemeBuilder.TEXT_GOLD, 3)
+	UiThemeBuilder.style_label(hero_sub_lbl, UiThemeBuilder.font_body(), 16, UiThemeBuilder.TEXT_PARCHMENT, 2)
+	UiThemeBuilder.style_label(skill_tooltip_lbl, UiThemeBuilder.font_body(), 15, UiThemeBuilder.TEXT_PARCHMENT, 1)
+	UiThemeBuilder.style_cta_button(embark_btn, 22)
 
 	hero_name_lbl.text = hdef.display_name.to_upper()
 	hero_sub_lbl.text = "%s  ·  Hero Power %d" % [hdef.subtitle, hero_pwr]
@@ -276,23 +274,28 @@ func refresh_ui() -> void:
 	for k in _hero_card_btns:
 		var entry: Dictionary = _hero_card_btns[k]
 		var active := (str(k) == cid)
-		var playable := bool(entry["playable"])
 		var btn: Button = entry["btn"]
-		UiThemeBuilder.style_tab_button(btn, active, 12)
-		if not playable:
-			var lock_bg := UiThemeBuilder.make_box(Color(0.055, 0.060, 0.075, 0.72), UiThemeBuilder.BORDER_SLATE, 1, 4, 8, 5)
-			btn.add_theme_stylebox_override("normal", lock_bg)
-			btn.add_theme_stylebox_override("hover", lock_bg)
-			btn.add_theme_stylebox_override("pressed", lock_bg)
+		var bg := Color(0.16, 0.11, 0.085, 0.90) if active else Color(0.055, 0.060, 0.080, 0.78)
+		var bdr := UiThemeBuilder.BORDER_GOLD if active else Color(0.36, 0.34, 0.30, 0.45)
+		var sb := UiThemeBuilder.make_box(bg, bdr, 2 if active else 1, 14, 6, 4)
+		var sb_h := UiThemeBuilder.make_box(bg.lightened(0.08), UiThemeBuilder.BORDER_GOLD, 2, 14, 6, 4)
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb_h)
+		btn.add_theme_stylebox_override("focus", sb_h)
+		btn.add_theme_stylebox_override("pressed", sb)
+
 		var nlbl: Label = entry["name_lbl"]
-		nlbl.add_theme_color_override("font_color", UiThemeBuilder.TEXT_GOLD if active else UiThemeBuilder.TEXT_MUTED)
+		var slbl: Label = entry["sub_lbl"]
+		UiThemeBuilder.style_label(nlbl, UiThemeBuilder.font_title(), 13, UiThemeBuilder.TEXT_GOLD if active else UiThemeBuilder.TEXT_PARCHMENT, 1)
+		UiThemeBuilder.style_label(slbl, UiThemeBuilder.font_body(), 12, UiThemeBuilder.TEXT_MUTED, 1)
+
 		var pframe: PanelContainer = entry["frame"]
 		pframe.add_theme_stylebox_override(
 			"panel",
-			UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_GOLD if active else UiThemeBuilder.BORDER_SLATE, 2 if active else 1, 4, 2, 2)
+			UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_GOLD if active else UiThemeBuilder.BORDER_SLATE, 2 if active else 1, 10, 2, 2)
 		)
 
-	_rebuild_skill_strip(hdef)
+	_rebuild_skill_badges(hdef)
 
 	var cleared_map: Dictionary = gs.get("cleared_zones") if gs != null and gs.get("cleared_zones") is Dictionary else {}
 	var roman := ["I", "II", "III", "IV"]
@@ -304,11 +307,8 @@ func refresh_ui() -> void:
 		var selected := (zdef.zone_id == zid) and unlocked
 		btn.disabled = not unlocked
 		var idx := clampi(zdef.depth_index, 0, roman.size() - 1)
-		var short_z := "FRINGE" if zdef.zone_id == "fringe" else zdef.display_name.get_slice(" ", 1).to_upper()
-		if short_z == "":
-			short_z = zdef.display_name.to_upper()
-		btn.text = "%s · %s" % [roman[idx], short_z if unlocked else "LOCKED"]
-		UiThemeBuilder.style_tab_button(btn, selected, 12)
+		btn.text = "%s · %s" % [roman[idx], _zone_short_name(zdef) if unlocked else "LOCKED"]
+		UiThemeBuilder.style_tab_button(btn, selected, 13)
 
 	var sel_zone := GameRegistry.get_zone(zid)
 	if sel_zone == null:
@@ -317,51 +317,50 @@ func refresh_ui() -> void:
 	var cleared_arr: Variant = cleared_map.get(sel_zone.zone_id, [])
 	var is_cleared := (cleared_arr is Array) and not (cleared_arr as Array).is_empty()
 
-	var fbtn: Button = _featured_zone_widgets["btn"]
-	UiThemeBuilder.style_tab_button(fbtn, true, 13)
 	var btex: TextureRect = _featured_zone_widgets["btex"]
 	btex.texture = UiThemeBuilder.get_portrait(sel_zone.boss_id)
 	btex.modulate = Color.WHITE if unlocked_sel else Color(0.4, 0.4, 0.45, 0.85)
+
 	var ztitle: Label = _featured_zone_widgets["title"]
 	var zsub: Label = _featured_zone_widgets["sub"]
+	UiThemeBuilder.style_label(ztitle, UiThemeBuilder.font_title(), 16, UiThemeBuilder.TEXT_GOLD, 1)
+	UiThemeBuilder.style_label(zsub, UiThemeBuilder.font_body(), 14, UiThemeBuilder.TEXT_PARCHMENT, 1)
+
 	var boss_def := GameRegistry.get_enemy(sel_zone.boss_id)
 	var boss_short := boss_def.display_name if boss_def != null else sel_zone.boss_id
-	if sel_zone.zone_id == "fringe":
-		ztitle.text = "Depth 1 · Barrow Fringe (The Ashen Nave)"
-	else:
-		ztitle.text = "Depth %d · %s" % [sel_zone.depth_index + 1, sel_zone.display_name]
+	var cleared_tag := "  ·  PURGED" if is_cleared else ""
+	ztitle.text = "Depth %d · %s%s" % [sel_zone.depth_index + 1, sel_zone.display_name, cleared_tag]
 	zsub.text = "Guardian: %s  ·  Tier %d Relics" % [boss_short, sel_zone.max_drop_tier]
 
-	var status_lbl: Label = _featured_zone_widgets["status"]
-	if is_cleared:
-		status_lbl.text = "ACTIVE · CLEARED"
-		status_lbl.add_theme_color_override("font_color", UiThemeBuilder.TEXT_READY)
-	else:
-		status_lbl.text = "SELECTED"
-		status_lbl.add_theme_color_override("font_color", UiThemeBuilder.TEXT_GOLD)
-
+	var pwr_badge: PanelContainer = _featured_zone_widgets["pwr_badge"]
 	var pwr_lbl: Label = _featured_zone_widgets["pwr"]
-	pwr_lbl.text = "Rec %d / You %d" % [sel_zone.recommended_power, hero_pwr]
 	var pwr_col := UiThemeBuilder.TEXT_READY if hero_pwr >= sel_zone.recommended_power else (UiThemeBuilder.TEXT_GOLD if hero_pwr >= int(float(sel_zone.recommended_power) * 0.75) else UiThemeBuilder.TEXT_CRIMSON)
-	pwr_lbl.add_theme_color_override("font_color", pwr_col)
+	pwr_badge.add_theme_stylebox_override("panel", UiThemeBuilder.make_pill(Color(0.04, 0.044, 0.06, 0.86), pwr_col.darkened(0.20), 10, 5))
+	UiThemeBuilder.style_label(pwr_lbl, UiThemeBuilder.font_bold(), 14, pwr_col, 1)
+	pwr_lbl.text = "REC %d" % sel_zone.recommended_power
 
 	for dk in _diff_btns:
 		var dbtn: Button = _diff_btns[dk]
-		var is_act := (int(dk) == diff)
-		UiThemeBuilder.style_tab_button(dbtn, is_act, 12)
+		UiThemeBuilder.style_pill_button(dbtn, int(dk) == diff, 13)
 
 	var z_title := sel_zone.display_name.to_upper() if sel_zone != null else "BARROW FRINGE"
-	embark_btn.text = "EMBARK ON HUNT  —  %s" % z_title
+	embark_btn.text = "EMBARK  —  %s" % z_title
 
 	if stage_3d != null:
 		stage_3d.refresh_hero()
 
 
-func _rebuild_skill_strip(hdef: HeroClassDef) -> void:
-	for ch in skill_row.get_children():
-		ch.queue_free()
+func _rebuild_skill_badges(hdef: HeroClassDef) -> void:
 	if hdef == null:
 		return
+	if _last_skill_class_id != hdef.class_id:
+		_active_tooltip_ab_id = ""
+		skill_tooltip_panel.visible = false
+		_last_skill_class_id = hdef.class_id
+
+	for ch in skill_badges_row.get_children():
+		ch.queue_free()
+	_skill_badge_btns.clear()
 
 	var entries: Array[AbilityDef] = [hdef.skill_1, hdef.skill_2]
 	if hdef.skill_3 != null:
@@ -371,59 +370,61 @@ func _rebuild_skill_strip(hdef: HeroClassDef) -> void:
 	for ab in entries:
 		if ab == null:
 			continue
-		var card := PanelContainer.new()
-		card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		card.custom_minimum_size = Vector2(0, 56)
-		card.add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_SLATE, 1, 5, 7, 5))
-
-		var hb := HBoxContainer.new()
-		hb.add_theme_constant_override("separation", 8)
-		card.add_child(hb)
+		var is_sel := (_active_tooltip_ab_id == ab.ability_id)
+		var btn := Button.new()
+		btn.custom_minimum_size = Vector2(52, 52)
+		var sb := UiThemeBuilder.make_box(
+			Color(0.14, 0.11, 0.08, 0.90) if is_sel else Color(0.05, 0.055, 0.075, 0.82),
+			UiThemeBuilder.BORDER_GOLD if is_sel else Color(0.75, 0.60, 0.30, 0.60),
+			2 if is_sel else 1,
+			26,
+			0,
+			0
+		)
+		var sb_h := UiThemeBuilder.make_box(Color(0.14, 0.12, 0.10, 0.92), UiThemeBuilder.BORDER_GOLD, 2, 26, 0, 0)
+		btn.add_theme_stylebox_override("normal", sb)
+		btn.add_theme_stylebox_override("hover", sb_h)
+		btn.add_theme_stylebox_override("focus", sb_h)
+		btn.add_theme_stylebox_override("pressed", sb_h)
+		btn.pressed.connect(_on_skill_badge_pressed.bind(ab))
 
 		var icon_tex := TextureRect.new()
-		icon_tex.custom_minimum_size = Vector2(40, 40)
-		icon_tex.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		icon_tex.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
+		icon_tex.offset_left = 6.0
+		icon_tex.offset_top = 6.0
+		icon_tex.offset_right = -6.0
+		icon_tex.offset_bottom = -6.0
 		icon_tex.texture = UiThemeBuilder.get_skill_icon(ab.ability_id)
 		icon_tex.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
 		icon_tex.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_CENTERED
-		hb.add_child(icon_tex)
+		icon_tex.mouse_filter = Control.MOUSE_FILTER_IGNORE
+		btn.add_child(icon_tex)
 
-		var vb := VBoxContainer.new()
-		vb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		vb.alignment = BoxContainer.ALIGNMENT_CENTER
-		vb.add_theme_constant_override("separation", 1)
-		hb.add_child(vb)
+		skill_badges_row.add_child(btn)
+		_skill_badge_btns[ab.ability_id] = btn
 
-		var top := HBoxContainer.new()
-		vb.add_child(top)
 
-		var name_lbl := Label.new()
-		name_lbl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-		name_lbl.text = ab.display_name
-		name_lbl.clip_text = true
-		UiThemeBuilder.style_label(name_lbl, UiThemeBuilder.font_title(), 13, UiThemeBuilder.TEXT_GOLD)
-		top.add_child(name_lbl)
-
-		var cd_lbl := Label.new()
-		cd_lbl.text = "%.1fs" % ab.cooldown_sec
-		UiThemeBuilder.style_label(cd_lbl, UiThemeBuilder.font_bold(), 11, UiThemeBuilder.TEXT_MUTED, 1)
-		top.add_child(cd_lbl)
-
-		var desc := Label.new()
-		desc.text = ab.description
-		desc.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		desc.max_lines_visible = 2
-		UiThemeBuilder.style_label(desc, UiThemeBuilder.font_body(), 11, UiThemeBuilder.TEXT_PARCHMENT, 1)
-		vb.add_child(desc)
-
-		skill_row.add_child(card)
+func _on_skill_badge_pressed(ab: AbilityDef) -> void:
+	if ab == null:
+		return
+	var ad := _audio()
+	if ad != null:
+		ad.call("sfx", "ui_tap")
+	if _active_tooltip_ab_id == ab.ability_id:
+		_active_tooltip_ab_id = ""
+		skill_tooltip_panel.visible = false
+	else:
+		_active_tooltip_ab_id = ab.ability_id
+		skill_tooltip_lbl.text = "%s (%.1fs) — %s" % [ab.display_name, ab.cooldown_sec, ab.description]
+		skill_tooltip_panel.visible = true
+	var gs := _game_state()
+	var hdef := GameRegistry.get_class_def(_selected_class_id(gs))
+	if hdef != null:
+		_rebuild_skill_badges(hdef)
 
 
 func _on_hero_card_pressed(cid: String) -> void:
-	if cid != ACTIVE_SLICE_CLASS:
-		var ad := _audio()
-		if ad != null:
-			ad.call("sfx", "ui_error")
+	if GameRegistry.get_class_def(cid) == null:
 		return
 	var ad := _audio()
 	if ad != null:
@@ -463,7 +464,7 @@ func _on_embark_pressed() -> void:
 	if ad != null:
 		ad.call("sfx", "ui_press")
 	var gs := _game_state()
-	var cid := ACTIVE_SLICE_CLASS
+	var cid := _selected_class_id(gs)
 	var zid := str(gs.get("selected_zone_id")) if gs != null else "fringe"
 	var diff := int(gs.get("selected_difficulty")) if gs != null else 0
 	embark_requested.emit(cid, zid, diff)

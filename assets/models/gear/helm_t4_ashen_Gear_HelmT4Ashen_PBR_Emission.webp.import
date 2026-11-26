@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://1l0b50f1eagb"
-path="res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.ctex"
+path.s3tc="res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.s3tc.ctex"
+path.etc2="res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "0adb11e76a9325bd543179a504b2b1fa"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/gear/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp"
-dest_files=["res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.ctex"]
+dest_files=["res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.s3tc.ctex", "res://.godot/imported/helm_t4_ashen_Gear_HelmT4Ashen_PBR_Emission.webp-16a9718d087f209e163c3181ef81228f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

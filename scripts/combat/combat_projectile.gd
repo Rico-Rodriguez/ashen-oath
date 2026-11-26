@@ -1,6 +1,16 @@
 class_name CombatProjectile
 extends Node3D
 
+const VFX_NOISE_TEX_PATH := "res://assets/textures/vfx_noise_tile.png"
+
+static var _cached_flame_sh: Shader = null
+static var _cached_energy_sh: Shader = null
+static var _cached_spark_sh: Shader = null
+static var _cached_noise_tex: Texture2D = null
+static var _cached_tail_quad: QuadMesh = null
+static var _cached_head_quad: QuadMesh = null
+static var _cached_lance_mesh: CylinderMesh = null
+
 var director: Node = null
 var vfx: Node3D = null
 var attacker: Node3D = null
@@ -150,7 +160,7 @@ func _try_ricochet_to_next_enemy(from_pos: Vector3, enemies: Array) -> bool:
 			from_pos + Vector3(0.0, 1.0, 0.0),
 			best_enemy.global_position + Vector3(0.0, 1.0, 0.0),
 		])
-		vfx.call("spawn_chain_lightning", pts)
+		vfx.call("spawn_chain_lightning", pts, false)
 
 	var ad := _audio()
 	if ad != null:
@@ -219,10 +229,22 @@ func _build_flame_bolt_visual(core_hdr: Vector3, mid_flame: Vector3, light_col: 
 	holder.name = "VolumetricBoltVfx"
 	add_child(holder)
 
-	var flame_sh := load("res://shaders/vfx_smokey_flame.gdshader") as Shader
-	if flame_sh != null:
+	if _cached_flame_sh == null:
+		_cached_flame_sh = load("res://shaders/vfx_smokey_flame.gdshader") as Shader
+	if _cached_noise_tex == null and ResourceLoader.exists(VFX_NOISE_TEX_PATH):
+		_cached_noise_tex = load(VFX_NOISE_TEX_PATH) as Texture2D
+	if _cached_tail_quad == null:
+		_cached_tail_quad = QuadMesh.new()
+		_cached_tail_quad.size = Vector2(0.54, 1.32)
+	if _cached_head_quad == null:
+		_cached_head_quad = QuadMesh.new()
+		_cached_head_quad.size = Vector2(0.70, 0.84)
+
+	if _cached_flame_sh != null:
 		var tail_mat := ShaderMaterial.new()
-		tail_mat.shader = flame_sh
+		tail_mat.shader = _cached_flame_sh
+		if _cached_noise_tex != null:
+			tail_mat.set_shader_parameter("noise_tex", _cached_noise_tex)
 		tail_mat.set_shader_parameter("billboard_mode", false)
 		tail_mat.set_shader_parameter("soot_dominance", soot)
 		tail_mat.set_shader_parameter("core_hdr", core_hdr)
@@ -230,29 +252,26 @@ func _build_flame_bolt_visual(core_hdr: Vector3, mid_flame: Vector3, light_col: 
 		tail_mat.set_shader_parameter("scroll_speed", 4.8)
 		tail_mat.set_shader_parameter("noise_scale", 5.2)
 
-		var tail_q := QuadMesh.new()
-		tail_q.size = Vector2(0.54, 1.32)
-		for z_deg in [0.0, 90.0]:
-			var tmi := MeshInstance3D.new()
-			tmi.mesh = tail_q
-			tmi.rotation_degrees = Vector3(90.0, 0.0, z_deg)
-			tmi.position = Vector3(0.0, 0.0, 0.22)
-			tmi.material_override = tail_mat
-			tmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
-			holder.add_child(tmi)
+		var tmi := MeshInstance3D.new()
+		tmi.mesh = _cached_tail_quad
+		tmi.rotation_degrees = Vector3(90.0, 0.0, 0.0)
+		tmi.position = Vector3(0.0, 0.0, 0.22)
+		tmi.material_override = tail_mat
+		tmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		holder.add_child(tmi)
 
 		var head_mat := ShaderMaterial.new()
-		head_mat.shader = flame_sh
+		head_mat.shader = _cached_flame_sh
 		head_mat.render_priority = 1
+		if _cached_noise_tex != null:
+			head_mat.set_shader_parameter("noise_tex", _cached_noise_tex)
 		head_mat.set_shader_parameter("billboard_mode", true)
 		head_mat.set_shader_parameter("soot_dominance", maxf(0.18, soot - 0.22))
 		head_mat.set_shader_parameter("core_hdr", core_hdr * 1.15)
 		head_mat.set_shader_parameter("mid_flame", mid_flame)
 		head_mat.set_shader_parameter("scroll_speed", 4.4)
-		var hq := QuadMesh.new()
-		hq.size = Vector2(0.70, 0.84)
 		var hmi := MeshInstance3D.new()
-		hmi.mesh = hq
+		hmi.mesh = _cached_head_quad
 		hmi.position = Vector3(0.0, 0.0, -0.14)
 		hmi.material_override = head_mat
 		hmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
@@ -260,24 +279,25 @@ func _build_flame_bolt_visual(core_hdr: Vector3, mid_flame: Vector3, light_col: 
 
 	_attach_bolt_trail_sparks(holder, light_col)
 
-	var light := OmniLight3D.new()
-	light.light_color = light_col
-	light.light_energy = 1.45
-	light.omni_range = 3.4
-	light.shadow_enabled = false
-	holder.add_child(light)
-
 
 func _build_energy_shard_visual(energy_col: Color) -> void:
 	var holder := Node3D.new()
 	holder.name = "EnergyShardVfx"
 	add_child(holder)
 
-	var energy_sh := load("res://shaders/vfx_energy.gdshader") as Shader
+	if _cached_energy_sh == null:
+		_cached_energy_sh = load("res://shaders/vfx_energy.gdshader") as Shader
+	if _cached_lance_mesh == null:
+		_cached_lance_mesh = CylinderMesh.new()
+		_cached_lance_mesh.top_radius = 0.0
+		_cached_lance_mesh.bottom_radius = 0.12
+		_cached_lance_mesh.height = 1.38
+		_cached_lance_mesh.radial_segments = 4
+
 	var shard_mat: Material
-	if energy_sh != null:
+	if _cached_energy_sh != null:
 		var sm := ShaderMaterial.new()
-		sm.shader = energy_sh
+		sm.shader = _cached_energy_sh
 		sm.set_shader_parameter("beam_mode", 0)
 		sm.set_shader_parameter("energy_color", energy_col)
 		sm.set_shader_parameter("hdr_gain", 2.65)
@@ -288,26 +308,14 @@ func _build_energy_shard_visual(energy_col: Color) -> void:
 		std.albedo_color = energy_col * 2.2
 		shard_mat = std
 
-	var lance := CylinderMesh.new()
-	lance.top_radius = 0.0
-	lance.bottom_radius = 0.12
-	lance.height = 1.38
-	lance.radial_segments = 4
 	var mi := MeshInstance3D.new()
-	mi.mesh = lance
+	mi.mesh = _cached_lance_mesh
 	mi.rotation_degrees.x = -90.0
 	mi.material_override = shard_mat
 	mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	holder.add_child(mi)
 
 	_attach_bolt_trail_sparks(holder, energy_col)
-
-	var light := OmniLight3D.new()
-	light.light_color = energy_col
-	light.light_energy = 1.35
-	light.omni_range = 3.0
-	light.shadow_enabled = false
-	holder.add_child(light)
 
 
 func _attach_bolt_trail_sparks(holder: Node3D, col: Color) -> void:
@@ -334,19 +342,21 @@ func _attach_bolt_trail_sparks(holder: Node3D, col: Color) -> void:
 	gtex.gradient = grad
 	proc.color_ramp = gtex
 
+	if _cached_spark_sh == null:
+		_cached_spark_sh = load("res://shaders/vfx_spark.gdshader") as Shader
 	var spark_mesh := BladeScrapeVfx.make_crossed_spark_mesh(0.055, 0.24)
-	var spark_sh := load("res://shaders/vfx_spark.gdshader") as Shader
-	if spark_sh != null:
+	if _cached_spark_sh != null:
 		var sm := ShaderMaterial.new()
-		sm.shader = spark_sh
+		sm.shader = _cached_spark_sh
 		sm.render_priority = 2
 		sm.set_shader_parameter("spark_hdr", Vector4(col.r * 4.2, col.g * 3.8, col.b * 3.2, 1.0))
 		spark_mesh.surface_set_material(0, sm)
 
 	var gp := GPUParticles3D.new()
-	gp.amount = 16
+	gp.amount = 6
 	gp.lifetime = 0.30
 	gp.local_coords = false
+	gp.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 	gp.process_material = proc
 	gp.draw_pass_1 = spark_mesh
 	holder.add_child(gp)

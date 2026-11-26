@@ -1,28 +1,43 @@
 class_name SanctuaryStage3D
-extends PanelContainer
+extends Control
 
-@export var camera_distance: float = 4.65
+const VFX_NOISE_TEX_PATH := "res://assets/textures/vfx_noise_tile.png"
+const CATHEDRAL_IBL_PANORAMA_PATH := "res://assets/textures/cathedral_ibl_panorama.png"
+const MOONLIGHT_SHAFT_SHADER_PATH := "res://shaders/moonlight_shaft.gdshader"
+const EMBER_PARTICLE_SHADER_PATH := "res://shaders/ember_particle.gdshader"
+
+static var _cached_panorama_sky: Sky = null
+
+@export var camera_fov: float = 38.0
+@export var camera_distance: float = 7.15
 @export var camera_height: float = 1.62
-@export var look_height: float = 1.24
+@export var look_height: float = 0.72
 
 @onready var viewport_container: SubViewportContainer = $ViewportStack/SubViewportContainer
 @onready var sub_viewport: SubViewport = $ViewportStack/SubViewportContainer/SubViewport
 @onready var turntable_pivot: Node3D = $ViewportStack/SubViewportContainer/SubViewport/StageRoot/TurntablePivot
 @onready var stage_camera: Camera3D = $ViewportStack/SubViewportContainer/SubViewport/StageCamera
+@onready var rotate_hint: Label = $ViewportStack/RotateHint
 
+var _stage_mode: String = "sanctum"
 var _hero_visual: ActorVisual = null
 var _loaded_class_id: String = ""
+var _last_dress_signature: String = ""
+var _external_paused: bool = false
 var _target_yaw: float = 0.28
 var _current_yaw: float = 0.28
 var _dragging: bool = false
+var _seen_touch: bool = false
+var _drag_touch_index: int = -1
 var _last_drag_x: float = 0.0
+var _spin_vel: float = 0.0
+var _hint_dismissed: bool = false
 var _flicker_time: float = 0.0
 var _built_props: bool = false
 var _brazier_lights: Array[OmniLight3D] = []
 
 
 func _ready() -> void:
-	add_theme_stylebox_override("panel", UiThemeBuilder.make_box(UiThemeBuilder.BG_ABYSS, UiThemeBuilder.BORDER_BRONZE, 1, 5, 2, 2))
 	_build_sanctuary_props()
 	_configure_camera()
 
@@ -44,14 +59,43 @@ func _notification(what: int) -> void:
 		_sync_viewport_mode()
 
 
+func set_stage_mode(mode: String) -> void:
+	_stage_mode = mode
+	if mode == "armory":
+		camera_fov = 38.0
+		camera_distance = 5.10
+		camera_height = 1.62
+		look_height = 1.44
+		if rotate_hint != null:
+			rotate_hint.anchor_top = 0.84
+			rotate_hint.anchor_bottom = 0.84
+	else:
+		camera_fov = 38.0
+		camera_distance = 7.15
+		camera_height = 1.62
+		look_height = 0.72
+		if rotate_hint != null:
+			rotate_hint.anchor_top = 0.61
+			rotate_hint.anchor_bottom = 0.61
+	_configure_camera()
+
+
+func set_external_paused(paused: bool) -> void:
+	if _external_paused == paused:
+		return
+	_external_paused = paused
+	_sync_viewport_mode()
+
+
 func _sync_viewport_mode() -> void:
 	if sub_viewport == null:
 		return
-	sub_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if is_visible_in_tree() else SubViewport.UPDATE_DISABLED
+	var active := is_visible_in_tree() and not _external_paused
+	sub_viewport.render_target_update_mode = SubViewport.UPDATE_ALWAYS if active else SubViewport.UPDATE_DISABLED
 
 
 func _process(delta: float) -> void:
-	if not is_visible_in_tree():
+	if not is_visible_in_tree() or _external_paused:
 		return
 	_flicker_time += delta
 	for i in range(_brazier_lights.size()):
@@ -60,34 +104,92 @@ func _process(delta: float) -> void:
 			var phase := float(i) * 2.1
 			bl.light_energy = 2.45 + sin(_flicker_time * 7.3 + phase) * 0.24 + cos(_flicker_time * 13.1 + phase) * 0.14
 	if not _dragging:
-		_target_yaw += delta * 0.14
-	_current_yaw = lerp_angle(_current_yaw, _target_yaw, 1.0 - exp(-12.0 * delta))
+		if absf(_spin_vel) > 0.015:
+			_target_yaw += _spin_vel * delta
+			_spin_vel = lerpf(_spin_vel, 0.0, 1.0 - exp(-5.0 * delta))
+		else:
+			_spin_vel = 0.0
+			_target_yaw += delta * 0.14
+	_current_yaw = lerp_angle(_current_yaw, _target_yaw, 1.0 - exp(-14.0 * delta))
 	if turntable_pivot != null:
 		turntable_pivot.rotation.y = _current_yaw
 
 
+func _input(event: InputEvent) -> void:
+	if not _dragging:
+		return
+	if event is InputEventScreenTouch:
+		var st := event as InputEventScreenTouch
+		if st.index == _drag_touch_index and (not st.pressed or st.canceled):
+			_dragging = false
+			_drag_touch_index = -1
+	elif event is InputEventMouseButton and not _seen_touch:
+		var mb := event as InputEventMouseButton
+		if mb.button_index == MOUSE_BUTTON_LEFT and not mb.pressed:
+			_dragging = false
+
+
 func _gui_input(event: InputEvent) -> void:
-	if event is InputEventMouseButton:
+	if event is InputEventScreenTouch:
+		_seen_touch = true
+		var st := event as InputEventScreenTouch
+		if st.pressed and not st.canceled:
+			if not _dragging:
+				_dragging = true
+				_drag_touch_index = st.index
+				_last_drag_x = st.position.x
+				_spin_vel = 0.0
+				_dismiss_rotate_hint()
+			accept_event()
+		elif st.index == _drag_touch_index:
+			_dragging = false
+			_drag_touch_index = -1
+			accept_event()
+	elif event is InputEventScreenDrag:
+		_seen_touch = true
+		var sd := event as InputEventScreenDrag
+		if _dragging and sd.index == _drag_touch_index:
+			var dyaw := sd.relative.x * 0.012
+			_target_yaw += dyaw
+			_spin_vel = clampf(lerpf(_spin_vel, dyaw * 48.0, 0.45), -7.5, 7.5)
+			_dismiss_rotate_hint()
+			accept_event()
+	elif event is InputEventMouseButton:
+		if _seen_touch:
+			return
 		var mb := event as InputEventMouseButton
 		if mb.button_index == MOUSE_BUTTON_LEFT:
 			_dragging = mb.pressed
 			_last_drag_x = mb.position.x
+			if mb.pressed:
+				_spin_vel = 0.0
+				_dismiss_rotate_hint()
 			accept_event()
 	elif event is InputEventMouseMotion and _dragging:
+		if _seen_touch:
+			return
 		var mm := event as InputEventMouseMotion
 		var dx := mm.position.x - _last_drag_x
 		_last_drag_x = mm.position.x
-		_target_yaw += dx * 0.014
+		var dyaw := dx * 0.012
+		_target_yaw += dyaw
+		_spin_vel = clampf(lerpf(_spin_vel, dyaw * 48.0, 0.45), -7.5, 7.5)
 		accept_event()
-	elif event is InputEventScreenTouch:
-		var st := event as InputEventScreenTouch
-		_dragging = st.pressed
-		_last_drag_x = st.position.x
-		accept_event()
-	elif event is InputEventScreenDrag:
-		var sd := event as InputEventScreenDrag
-		_target_yaw += sd.relative.x * 0.014
-		accept_event()
+
+
+func _dismiss_rotate_hint() -> void:
+	if _hint_dismissed or rotate_hint == null or not is_instance_valid(rotate_hint):
+		return
+	_hint_dismissed = true
+	if is_inside_tree():
+		var tw := create_tween()
+		tw.tween_property(rotate_hint, "modulate:a", 0.0, 0.35).set_trans(Tween.TRANS_QUAD).set_ease(Tween.EASE_OUT)
+		tw.tween_callback(func() -> void:
+			if rotate_hint != null and is_instance_valid(rotate_hint):
+				rotate_hint.visible = false
+		)
+	else:
+		rotate_hint.visible = false
 
 
 func _on_state_changed_str(_id: String) -> void:
@@ -105,21 +207,6 @@ func refresh_hero() -> void:
 	if hdef == null:
 		return
 
-	if _hero_visual == null or not is_instance_valid(_hero_visual) or _loaded_class_id != cid:
-		if _hero_visual != null and is_instance_valid(_hero_visual):
-			turntable_pivot.remove_child(_hero_visual)
-			_hero_visual.queue_free()
-			_hero_visual = null
-		var ps := load(hdef.actor_scene_path) as PackedScene
-		if ps != null:
-			_hero_visual = ps.instantiate() as ActorVisual
-			turntable_pivot.add_child(_hero_visual)
-			_hero_visual.ensure_initialized()
-			_loaded_class_id = cid
-
-	if _hero_visual == null:
-		return
-
 	var cstats: CombatStats = null
 	if gs != null and gs.has_method("get_combat_stats"):
 		cstats = gs.call("get_combat_stats", cid)
@@ -132,6 +219,36 @@ func refresh_hero() -> void:
 		}
 		cstats = LootEngine.compute_combat_stats(hdef, eq)
 
+	var slot_ov := cstats.to_slot_overrides()
+	var dress_sig := "%s|%d|%s|%s|%s|%s|%s" % [
+		cid,
+		cstats.armor_tier,
+		cstats.weapon_mesh_key,
+		cstats.offhand_mesh_key,
+		str(cstats.has_plume),
+		cstats.lantern_color.to_html(true),
+		str(slot_ov),
+	]
+	if _hero_visual != null and is_instance_valid(_hero_visual) and _loaded_class_id == cid and dress_sig == _last_dress_signature:
+		return
+
+	if _hero_visual == null or not is_instance_valid(_hero_visual) or _loaded_class_id != cid:
+		if _hero_visual != null and is_instance_valid(_hero_visual):
+			turntable_pivot.remove_child(_hero_visual)
+			_hero_visual.queue_free()
+			_hero_visual = null
+		var ps := load(hdef.actor_scene_path) as PackedScene
+		if ps != null:
+			_hero_visual = ps.instantiate() as ActorVisual
+			_hero_visual.defer_hero_dress = true
+			turntable_pivot.add_child(_hero_visual)
+			_hero_visual.ensure_initialized()
+			_loaded_class_id = cid
+
+	if _hero_visual == null:
+		return
+
+	_last_dress_signature = dress_sig
 	HeroRigDresser.dress(
 		_hero_visual,
 		cid,
@@ -140,7 +257,7 @@ func refresh_hero() -> void:
 		cstats.offhand_mesh_key,
 		cstats.has_plume,
 		cstats.lantern_color,
-		cstats.to_slot_overrides()
+		slot_ov
 	)
 	_hero_visual.play_anim("idle", 1.0, false)
 	_center_hero_on_plinth()
@@ -161,7 +278,7 @@ func _center_hero_on_plinth() -> void:
 func _configure_camera() -> void:
 	if stage_camera == null:
 		return
-	stage_camera.fov = 34.0
+	stage_camera.fov = camera_fov
 	stage_camera.look_at_from_position(
 		Vector3(0.0, camera_height, -camera_distance),
 		Vector3(0.0, look_height, 0.0),
@@ -184,11 +301,14 @@ func _build_sanctuary_props() -> void:
 	var stone_mat := _make_cathedral_stone_material(Color(0.56, 0.58, 0.63))
 	var dark_stone_mat := _make_cathedral_stone_material(Color(0.32, 0.34, 0.40))
 
+	var noise_tex := load(VFX_NOISE_TEX_PATH) as Texture2D if ResourceLoader.exists(VFX_NOISE_TEX_PATH) else null
 	var ground_sh := load("res://shaders/vfx_barrow_ground.gdshader") as Shader
 	if ground_sh != null:
 		var gmat := ShaderMaterial.new()
 		gmat.shader = ground_sh
 		gmat.set_shader_parameter("ground_tint", Color(0.22, 0.23, 0.27, 1.0))
+		if noise_tex != null:
+			gmat.set_shader_parameter("noise_tex", noise_tex)
 		var tex_map := {
 			"forest_albedo": "res://assets/textures/ground_forest_color.jpg",
 			"forest_normal": "res://assets/textures/ground_forest_normal.jpg",
@@ -210,6 +330,7 @@ func _build_sanctuary_props() -> void:
 		floor_mi.mesh = pm
 		floor_mi.position = Vector3(0.0, 0.0, 2.0)
 		floor_mi.material_override = gmat
+		floor_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		stage_root.add_child(floor_mi)
 
 	var plinth_ps := load("res://assets/models/kit/kit_sanctum_plinth.glb") as PackedScene
@@ -228,6 +349,8 @@ func _build_sanctuary_props() -> void:
 	if flame_sh != null:
 		flame_mat = ShaderMaterial.new()
 		flame_mat.shader = flame_sh
+		if noise_tex != null:
+			flame_mat.set_shader_parameter("noise_tex", noise_tex)
 		flame_mat.set_shader_parameter("billboard_mode", true)
 		flame_mat.set_shader_parameter("soot_dominance", 0.38)
 		flame_mat.set_shader_parameter("core_hdr", Vector3(5.6, 2.5, 0.52))
@@ -237,22 +360,22 @@ func _build_sanctuary_props() -> void:
 	for side in [-1.0, 1.0]:
 		var b_node := Node3D.new()
 		b_node.name = "SanctumBrazierL" if side < 0.0 else "SanctumBrazierR"
-		b_node.position = Vector3(side * 1.56, 0.0, 1.48)
-		b_node.rotation.y = side * -0.45
+		b_node.position = Vector3(side * 1.12, 0.0, 1.72)
+		b_node.rotation.y = side * -0.42
 		stage_root.add_child(b_node)
 		if brazier_ps != null:
 			var b_inst := brazier_ps.instantiate() as Node3D
-			b_inst.scale = Vector3.ONE * 0.94
+			b_inst.scale = Vector3.ONE * 0.90
 			b_node.add_child(b_inst)
 		if flame_mat != null:
 			var f_mi := MeshInstance3D.new()
 			f_mi.mesh = flame_quad
-			f_mi.position = Vector3(0.0, 1.54, 0.0)
+			f_mi.position = Vector3(0.0, 1.48, 0.0)
 			f_mi.material_override = flame_mat
 			f_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			b_node.add_child(f_mi)
 		var blight := OmniLight3D.new()
-		blight.position = Vector3(0.0, 1.84, -0.10)
+		blight.position = Vector3(0.0, 1.78, -0.10)
 		blight.light_color = Color(1.0, 0.56, 0.18)
 		blight.light_energy = 2.45
 		blight.omni_range = 6.8
@@ -274,7 +397,7 @@ func _build_sanctuary_props() -> void:
 		for side in [-1.0, 1.0]:
 			var pil := pillar_ps.instantiate() as Node3D
 			pil.name = "CathedralPillarL" if side < 0.0 else "CathedralPillarR"
-			pil.position = Vector3(side * 2.65, 0.0, 2.75)
+			pil.position = Vector3(side * 2.45, 0.0, 2.85)
 			pil.scale = Vector3.ONE * 0.62
 			_apply_cathedral_stone_materials(pil, stone_mat, dark_stone_mat)
 			stage_root.add_child(pil)
@@ -301,12 +424,9 @@ func _configure_sanctuary_environment() -> void:
 		we.name = "WorldEnvironment"
 		sub_viewport.add_child(we)
 
-	var sky := Sky.new()
-	if ResourceLoader.exists("res://assets/textures/cathedral_ibl_panorama.png"):
-		var pmat := PanoramaSkyMaterial.new()
-		pmat.panorama = load("res://assets/textures/cathedral_ibl_panorama.png") as Texture2D
-		sky.sky_material = pmat
-	else:
+	var sky := _get_cached_panorama_sky()
+	if sky == null:
+		sky = Sky.new()
 		var sky_sh := load("res://shaders/sky_cathedral_ibl.gdshader") as Shader
 		if sky_sh != null:
 			var smat := ShaderMaterial.new()
@@ -334,6 +454,22 @@ func _configure_sanctuary_environment() -> void:
 	env.fog_light_color = Color(0.07, 0.08, 0.12)
 	env.fog_sky_affect = 0.45
 	we.environment = env
+
+
+static func _get_cached_panorama_sky() -> Sky:
+	if _cached_panorama_sky != null:
+		return _cached_panorama_sky
+	if ResourceLoader.exists(CATHEDRAL_IBL_PANORAMA_PATH):
+		var pano := load(CATHEDRAL_IBL_PANORAMA_PATH) as Texture2D
+		if pano != null:
+			var pmat := PanoramaSkyMaterial.new()
+			pmat.panorama = pano
+			pmat.energy_multiplier = 1.25
+			var sky := Sky.new()
+			sky.sky_material = pmat
+			_cached_panorama_sky = sky
+			return _cached_panorama_sky
+	return null
 
 
 static func _make_cathedral_stone_material(albedo: Color) -> StandardMaterial3D:
@@ -379,21 +515,9 @@ static func _apply_cathedral_stone_materials(root_node: Node3D, stone_mat: Stand
 func _build_moonlight_shafts(stage_root: Node3D) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	var shaft_sh := Shader.new()
-	shaft_sh.code = """
-shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-uniform vec3 shaft_color : source_color = vec3(0.44, 0.64, 1.0);
-uniform float shaft_alpha : hint_range(0.0, 0.5) = 0.12;
-void fragment() {
-	float x_fade = pow(clamp(1.0 - abs(UV.x * 2.0 - 1.0), 0.0, 1.0), 2.3);
-	float y_fade = smoothstep(0.0, 0.24, UV.y) * smoothstep(1.0, 0.16, UV.y);
-	float view_fade = pow(abs(dot(normalize(NORMAL), normalize(VIEW))), 1.35);
-	float shimmer = 0.88 + 0.12 * sin(UV.y * 12.0 + UV.x * 4.5 + TIME * 0.4);
-	ALBEDO = shaft_color;
-	ALPHA = x_fade * y_fade * view_fade * shimmer * shaft_alpha;
-}
-"""
+	var shaft_sh := load(MOONLIGHT_SHAFT_SHADER_PATH) as Shader
+	if shaft_sh == null:
+		return
 	var shafts_root := Node3D.new()
 	shafts_root.name = "CathedralMoonShafts"
 	stage_root.add_child(shafts_root)
@@ -421,26 +545,9 @@ void fragment() {
 func _build_cathedral_motes(stage_root: Node3D) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	var mote_sh := Shader.new()
-	mote_sh.code = """
-shader_type spatial;
-render_mode unshaded, blend_add, depth_draw_never, cull_disabled;
-void vertex() {
-	mat4 mat_world = mat4(
-		normalize(INV_VIEW_MATRIX[0]) * length(MODEL_MATRIX[0]),
-		normalize(INV_VIEW_MATRIX[1]) * length(MODEL_MATRIX[1]),
-		normalize(INV_VIEW_MATRIX[2]) * length(MODEL_MATRIX[2]),
-		MODEL_MATRIX[3]
-	);
-	MODELVIEW_MATRIX = VIEW_MATRIX * mat_world;
-}
-void fragment() {
-	float d = length(UV * 2.0 - 1.0);
-	float soft = pow(clamp(1.0 - d, 0.0, 1.0), 3.1);
-	ALBEDO = COLOR.rgb * 1.45;
-	ALPHA = soft * COLOR.a;
-}
-"""
+	var mote_sh := load(EMBER_PARTICLE_SHADER_PATH) as Shader
+	if mote_sh == null:
+		return
 	var mote_mat := ShaderMaterial.new()
 	mote_mat.shader = mote_sh
 	var mote_quad := QuadMesh.new()

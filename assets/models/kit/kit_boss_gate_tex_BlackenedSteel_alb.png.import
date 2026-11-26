@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://b3y7mn160kjoj"
-path="res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.ctex"
+path.s3tc="res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.s3tc.ctex"
+path.etc2="res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "131c823d59ec7a1802c8e0cb70f5495a"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/kit/kit_boss_gate_tex_BlackenedSteel_alb.png"
-dest_files=["res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.ctex"]
+dest_files=["res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.s3tc.ctex", "res://.godot/imported/kit_boss_gate_tex_BlackenedSteel_alb.png-f307a0f53947347906b34efd30b28b3b.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=1024
 detect_3d/compress_to=1

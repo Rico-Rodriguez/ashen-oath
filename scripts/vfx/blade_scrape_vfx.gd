@@ -60,6 +60,7 @@ func _ready() -> void:
 	_light.light_energy = 0.0
 	_light.omni_range = 3.2
 	_light.shadow_enabled = false
+	_light.visible = false
 	add_child(_light)
 
 	if _headless:
@@ -177,6 +178,7 @@ func update_scrape(blade_tip_world: Vector3, ground_y: float, is_dragging: bool,
 	if scraping:
 		var contact := Vector3(blade_tip_world.x, ground_y + 0.04, blade_tip_world.z)
 		if _light != null:
+			_light.visible = true
 			_light.global_position = contact + Vector3(0.0, 0.18, 0.0)
 			var flicker := 0.84 + 0.32 * absf(sin(_time_acc * 31.0 + cos(_time_acc * 17.0)))
 			_light.light_energy = 2.2 * flicker
@@ -225,8 +227,14 @@ func _process(delta: float) -> void:
 	_time_acc += delta
 	if _sfx_cooldown > 0.0:
 		_sfx_cooldown = maxf(0.0, _sfx_cooldown - delta)
-	if not _active_scraping and _light != null and _light.light_energy > 0.001:
-		_light.light_energy = move_toward(_light.light_energy, 0.0, delta * 14.0)
+	if not _active_scraping and _light != null:
+		if _light.light_energy > 0.001:
+			_light.light_energy = move_toward(_light.light_energy, 0.0, delta * 14.0)
+			if _light.light_energy <= 0.001:
+				_light.light_energy = 0.0
+				_light.visible = false
+		elif _light.visible:
+			_light.visible = false
 
 	if _headless or _streak_mesh == null:
 		return

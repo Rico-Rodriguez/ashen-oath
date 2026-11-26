@@ -54,8 +54,28 @@ func _physics_process(delta: float) -> void:
 		return
 
 	var d_xz := Vector2(hero.global_position.x - global_position.x, hero.global_position.z - global_position.z).length()
-	if d_xz <= trigger_radius:
+	if d_xz <= trigger_radius and not _has_nearby_alive_enemy(8.5):
 		_trigger_offer(hero)
+
+
+func _has_nearby_alive_enemy(radius_m: float) -> bool:
+	var r_sq := radius_m * radius_m
+	var enemies: Array = []
+	if director != null and director.has_method("get_alive_enemies"):
+		enemies = director.call("get_alive_enemies")
+	elif is_inside_tree():
+		enemies = get_tree().get_nodes_in_group("combat_enemies")
+	for raw in enemies:
+		var e := raw as Node3D
+		if e == null or not is_instance_valid(e):
+			continue
+		if e.has_method("is_dead") and bool(e.call("is_dead")):
+			continue
+		var dx := e.global_position.x - global_position.x
+		var dz := e.global_position.z - global_position.z
+		if dx * dx + dz * dz <= r_sq:
+			return true
+	return false
 
 
 func _trigger_offer(hero: Node3D) -> void:

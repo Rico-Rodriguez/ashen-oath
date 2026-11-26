@@ -120,7 +120,7 @@ func _test_move_while_attacking_all_classes(gs: Node) -> void:
 		_clear_enemies(arena)
 
 		var cam := arena.get_camera()
-		_check(cam != null and is_equal_approx(cam.fov, 42.0), "%s camera FOV is 42 deg" % cid)
+		_check(cam != null and is_equal_approx(cam.fov, CombatDirector.CAMERA_FOV_DEG), "%s camera FOV matches CombatDirector.CAMERA_FOV_DEG (%.1f deg)" % [cid, CombatDirector.CAMERA_FOV_DEG])
 
 		arena.hero.global_position = Vector3(0.0, 0.0, 10.0)
 		var dummy_dist := 4.5 if cid == "battlemage" else 1.8

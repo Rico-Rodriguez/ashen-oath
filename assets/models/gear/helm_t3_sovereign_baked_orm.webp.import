@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://ki42kdqlbqlg"
-path="res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.ctex"
+path.s3tc="res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.s3tc.ctex"
+path.etc2="res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "6a3112afc1623e571ee9af62e0181e6b"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/gear/helm_t3_sovereign_baked_orm.webp"
-dest_files=["res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.ctex"]
+dest_files=["res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.s3tc.ctex", "res://.godot/imported/helm_t3_sovereign_baked_orm.webp-2296f2903c0eb3822c36444eda53444c.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

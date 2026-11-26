@@ -1,13 +1,15 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
-[ext_resource type="PackedScene" path="res://assets/models/sketchfab/mon/scorpion.glb" id="2"]
+[ext_resource type="PackedScene" path="res://assets/models/kit/ash_scorpion.glb" id="2"]
 
 [node name="AshScorpion" type="Node3D"]
 script = ExtResource("1")
 actor_id = "ash_scorpion"
-height_meters = 1.55
+height_meters = 1.45
 yaw_offset_deg = 180.0
+emission_tint = Color(1, 0.45, 0.14, 1)
+emission_energy = 2.0
 
 [node name="ModelPivot" type="Node3D" parent="."]
 

@@ -22,6 +22,9 @@ extends Node3D
 @export var emission_energy: float = 1.8
 
 var slot_overrides: Dictionary = {}
+var defer_hero_dress: bool = false
+
+static var _posed_aabb_cache: Dictionary = {}
 
 var model_pivot: Node3D
 var model_instance: Node3D
@@ -41,6 +44,7 @@ var _flash_std_base_energy: Array[float] = []
 var _flash_std_had_emit: Array[bool] = []
 var _cloth_shaders: Array[ShaderMaterial] = []
 var _move_blend: float = 0.0
+var _last_cloth_blend: float = -1.0
 var _current_logical_anim: String = ""
 var _drag_pose_weight: float = 0.0
 var _enrage_light: OmniLight3D = null
@@ -67,6 +71,8 @@ const UNIFIED_KIT_CLIP_MAP := {
 	"attack_whirl": "attack_whirl",
 	"skill_whirl": "attack_whirl",
 	"skill_slam": "skill_slam",
+	"skill_cleave": "attack_2",
+	"skill_thrust": "attack_1",
 	"skill_cast": "skill_cast",
 	"skill_arc": "skill_cast",
 	"windup": "skill_cast",
@@ -92,8 +98,11 @@ const RIG_CLIP_MAP := {
 		"run": "walkForward",
 		"walk": "walkForward",
 		"attack": "clawAttackLeft",
+		"attack_1": "clawAttackLeft",
 		"attack2": "clawAttackRight",
+		"attack_2": "clawAttackRight",
 		"skill_cast": "stingerAttack",
+		"skill_slam": "stingerAttack",
 		"dash": "jump",
 		"hit": "buff1",
 		"death": "death",
@@ -197,25 +206,26 @@ func ensure_initialized() -> void:
 	_normalize_pivot_transform()
 
 	if is_hero:
-		var overrides := slot_overrides.duplicate()
-		if not overrides.has("cuirass_tier") and cuirass_tier > 0:
-			overrides["cuirass_tier"] = cuirass_tier
-		if not overrides.has("helm_tier") and helm_tier > 0:
-			overrides["helm_tier"] = helm_tier
-		if not overrides.has("lantern_tier"):
-			overrides["lantern_tier"] = lantern_tier
-		if not overrides.has("helm_key") and helm_key != "":
-			overrides["helm_key"] = helm_key
-		HeroRigDresser.dress(
-			self,
-			hero_class_id if hero_class_id != "" else actor_id,
-			armor_tier,
-			weapon_key,
-			offhand_key,
-			has_plume,
-			lantern_color,
-			overrides
-		)
+		if not defer_hero_dress:
+			var overrides := slot_overrides.duplicate()
+			if not overrides.has("cuirass_tier") and cuirass_tier > 0:
+				overrides["cuirass_tier"] = cuirass_tier
+			if not overrides.has("helm_tier") and helm_tier > 0:
+				overrides["helm_tier"] = helm_tier
+			if not overrides.has("lantern_tier"):
+				overrides["lantern_tier"] = lantern_tier
+			if not overrides.has("helm_key") and helm_key != "":
+				overrides["helm_key"] = helm_key
+			HeroRigDresser.dress(
+				self,
+				hero_class_id if hero_class_id != "" else actor_id,
+				armor_tier,
+				weapon_key,
+				offhand_key,
+				has_plume,
+				lantern_color,
+				overrides
+			)
 	else:
 		_configure_enemy_materials()
 
@@ -252,6 +262,7 @@ func register_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Ar
 			if not _flash_shaders.has(cm):
 				_flash_shaders.append(cm)
 			cm.set_shader_parameter("move_speed_norm", _move_blend)
+	_last_cloth_blend = _move_blend
 	for sm in std_mats:
 		if sm != null and not _flash_std_mats.has(sm):
 			_flash_std_mats.append(sm)
@@ -271,6 +282,7 @@ func append_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Arra
 			if not _flash_shaders.has(cm):
 				_flash_shaders.append(cm)
 			cm.set_shader_parameter("move_speed_norm", _move_blend)
+	_last_cloth_blend = _move_blend
 	for sm in std_mats:
 		if sm != null and not _flash_std_mats.has(sm):
 			_flash_std_mats.append(sm)
@@ -378,9 +390,11 @@ func trigger_hit_flash(duration: float = 0.11) -> void:
 
 func set_move_blend(speed_01: float) -> void:
 	_move_blend = clampf(speed_01, 0.0, 1.0)
-	for cm in _cloth_shaders:
-		if cm != null:
-			cm.set_shader_parameter("move_speed_norm", _move_blend)
+	if absf(_move_blend - _last_cloth_blend) > 0.01:
+		_last_cloth_blend = _move_blend
+		for cm in _cloth_shaders:
+			if cm != null:
+				cm.set_shader_parameter("move_speed_norm", _move_blend)
 	_update_weapon_drag_pose(0.0)
 
 
@@ -477,12 +491,29 @@ func _pose_for_measurement() -> void:
 		anim_player.advance(0.0)
 
 
+func _posed_aabb_cache_key() -> String:
+	if model_instance == null:
+		return ""
+	var model_path := model_instance.scene_file_path
+	if model_path == "":
+		return ""
+	var anim_path := anim_library_override.resource_path if anim_library_override != null else ""
+	return "%s|%s|%s" % [actor_id, model_path, anim_path]
+
+
 func _normalize_pivot_transform() -> void:
 	model_pivot.position = Vector3.ZERO
 	model_pivot.rotation = Vector3.ZERO
 	model_pivot.scale = Vector3.ONE
 
-	var raw_box := _compute_posed_model_aabb()
+	var cache_key := _posed_aabb_cache_key()
+	var raw_box: AABB
+	if cache_key != "" and _posed_aabb_cache.has(cache_key):
+		raw_box = _posed_aabb_cache[cache_key] as AABB
+	else:
+		raw_box = _compute_posed_model_aabb()
+		if cache_key != "" and raw_box.size.y > 0.0001:
+			_posed_aabb_cache[cache_key] = raw_box
 	if raw_box.size.y <= 0.0001:
 		model_pivot.rotation_degrees = Vector3(0.0, yaw_offset_deg, 0.0)
 		return
@@ -599,6 +630,8 @@ func _configure_enemy_materials() -> void:
 				var active := mi.get_active_material(s)
 				var mname := active.resource_name if active != null else ""
 				if (is_cloak_mesh or mname == "CapeCloth") and cloak_shader != null:
+					if is_cloak_mesh:
+						mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 					var base_c := Color(0.24, 0.032, 0.038)
 					var trim_c := Color(0.46, 0.28, 0.10)
 					var cmat := ShaderMaterial.new()
@@ -624,7 +657,7 @@ func _configure_enemy_materials() -> void:
 					sm.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 					if sm.emission.r + sm.emission.g + sm.emission.b < 0.05:
 						sm.emission = Color.WHITE
-					sm.emission_energy_multiplier = maxf(sm.emission_energy_multiplier, 1.8)
+					sm.emission_energy_multiplier = maxf(sm.emission_energy_multiplier, maxf(emission_energy, 1.8))
 				mi.set_surface_override_material(s, sm)
 				_flash_std_mats.append(sm)
 				_flash_std_had_emit.append(sm.emission_enabled)
@@ -652,14 +685,6 @@ func _configure_enemy_materials() -> void:
 				ba_l.add_child(cast_m)
 				cast_origin_marker = cast_m
 		return
-
-	var troll_veins := {}
-	if actor_id == "barrow_troll":
-		troll_veins = {
-			"MI_Troll_Body_Mountain01_Upper": load("res://assets/models/sketchfab/boss/troll_veins_upper.png"),
-			"MI_Troll_Body_Mountain01_Lower": load("res://assets/models/sketchfab/boss/troll_veins_lower.png"),
-			"MI_Troll_Heads_Cave": load("res://assets/models/sketchfab/boss/troll_veins_head.png"),
-		}
 
 	for n in model_instance.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
@@ -720,12 +745,12 @@ func _configure_enemy_materials() -> void:
 				sm.emission = emission_tint
 				sm.emission_energy_multiplier = emission_energy
 				sm.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
-			elif troll_veins.has(orig_name) and troll_veins[orig_name] != null:
+			elif sm.emission_texture != null:
 				sm.emission_enabled = true
-				sm.emission_texture = troll_veins[orig_name]
-				sm.emission = emission_tint
-				sm.emission_energy_multiplier = emission_energy
 				sm.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
+				if sm.emission.r + sm.emission.g + sm.emission.b < 0.05:
+					sm.emission = Color.WHITE
+				sm.emission_energy_multiplier = maxf(sm.emission_energy_multiplier, maxf(emission_energy, 1.8))
 
 			mi.set_surface_override_material(s, sm)
 			_flash_std_mats.append(sm)

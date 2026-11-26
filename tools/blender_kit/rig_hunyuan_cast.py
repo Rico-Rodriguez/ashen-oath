@@ -55,7 +55,7 @@ def _parse_args() -> argparse.Namespace:
     parser.add_argument("--cloak_style", choices=["dark", "crimson"], default="dark")
     parser.add_argument("--split_modular", action="store_true")
     parser.add_argument("--fix_plume", action="store_true")
-    parser.add_argument("--extract_ember_emission", choices=["", "none", "torso", "head"], default="")
+    parser.add_argument("--extract_ember_emission", choices=["", "none", "torso", "head", "both", "blight"], default="")
     parser.add_argument("--rest_arm_roll_deg", type=float, default=None)
     parser.add_argument("--tex_max_res", type=int, default=0)
     parser.add_argument("--albedo_max_res", type=int, default=2048)
@@ -329,8 +329,18 @@ def _rasterize_region_uv_mask(
         c = blender_to_godot(poly.center)
         if region == "torso":
             in_reg = (0.50 * height <= c.y <= 0.84 * height) and (abs(c.x) <= 0.28 * s)
-        else:
+        elif region == "head":
             in_reg = (c.y >= 0.84 * height) and (abs(c.x) <= 0.10 * s) and (c.z >= 0.05 * s)
+        elif region == "both":
+            in_torso = (0.42 * height <= c.y <= 0.84 * height) and (abs(c.x) <= 0.34 * s)
+            in_head = (c.y >= 0.78 * height) and (abs(c.x) <= 0.16 * s) and (c.z >= 0.02 * s)
+            in_reg = in_torso or in_head
+        elif region == "blight":
+            in_eyes = (c.y >= 0.74 * height) and (abs(c.x) <= 0.18 * s) and (c.z >= -0.02 * s)
+            in_veins = (0.38 * height <= c.y <= 0.84 * height) and (c.z >= -0.10 * s)
+            in_reg = in_eyes or in_veins
+        else:
+            in_reg = False
         if not in_reg:
             continue
         lidxs = list(poly.loop_indices)
@@ -373,7 +383,7 @@ def _extract_ember_emission_map(
     region: str,
     strength: float = 1.8,
 ) -> int:
-    if region not in ("torso", "head"):
+    if region not in ("torso", "head", "both", "blight"):
         return 0
     if not body.data.materials:
         return 0
@@ -402,19 +412,36 @@ def _extract_ember_emission_map(
 
     region_mask = _rasterize_region_uv_mask(body, height, region, w, h)
 
-    # Soft-threshold warm ember pixels (centered on R > 0.42, R - B > 0.24, R > G * 1.15).
-    m_r = np.clip((r - 0.36) / 0.14, 0.0, 1.0)
-    m_rb = np.clip(((r - b) - 0.20) / 0.10, 0.0, 1.0)
-    m_rg = np.clip((r / np.maximum(g, 1e-4) - 1.12) / 0.16, 0.0, 1.0)
-    raw_ember = m_r * m_rb * m_rg * region_mask
+    if region == "blight":
+        m_g = np.clip((g - 0.075) / 0.10, 0.0, 1.0)
+        m_gr = np.clip(((g - r) - 0.014) / 0.036, 0.0, 1.0)
+        m_gb = np.clip(((g - b) - 0.010) / 0.032, 0.0, 1.0)
+        m_ratio = np.clip((g / np.maximum(r, 1e-4) - 1.06) / 0.12, 0.0, 1.0)
+        raw_ember = np.minimum(np.minimum(m_g, m_gr), np.minimum(m_gb, m_ratio)) * region_mask
+    else:
+        # Soft-threshold warm ember pixels (centered on R > 0.42, R - B > 0.24, R > G * 1.15).
+        m_r = np.clip((r - 0.36) / 0.14, 0.0, 1.0)
+        m_rb = np.clip(((r - b) - 0.20) / 0.10, 0.0, 1.0)
+        m_rg = np.clip((r / np.maximum(g, 1e-4) - 1.12) / 0.16, 0.0, 1.0)
+        raw_ember = m_r * m_rb * m_rg * region_mask
 
     sigma = max(1.5, 2.8 * (w / 2048.0))
     halo = _gaussian_blur_2d(raw_ember, sigma=sigma) * region_mask
-    ember_weight = np.clip(0.88 * raw_ember + 0.55 * halo, 0.0, 1.0)
-
-    tint = np.array([1.0, 0.44, 0.10], dtype=np.float32) if region == "torso" else np.array([1.0, 0.62, 0.14], dtype=np.float32)
-    src_warm = np.stack([np.clip(r * 1.25, 0.0, 1.0), np.clip(g * 0.90, 0.0, 1.0), np.clip(b * 0.35, 0.0, 1.0)], axis=2)
-    emit_rgb = (0.55 * tint[None, None, :] + 0.45 * src_warm) * ember_weight[:, :, None]
+    if region == "blight":
+        ember_weight = np.power(np.clip(1.65 * raw_ember + 0.85 * halo, 0.0, 1.0), 0.72)
+        tint = np.array([0.24, 1.0, 0.36], dtype=np.float32)
+        src_col = np.stack([np.clip(r * 0.45, 0.0, 1.0), np.clip(g * 1.60, 0.0, 1.0), np.clip(b * 0.65, 0.0, 1.0)], axis=2)
+        emit_rgb = (0.88 * tint[None, None, :] + 0.12 * src_col) * ember_weight[:, :, None]
+    else:
+        ember_weight = np.clip(0.88 * raw_ember + 0.55 * halo, 0.0, 1.0)
+        if region == "torso":
+            tint = np.array([1.0, 0.44, 0.10], dtype=np.float32)
+        elif region == "both":
+            tint = np.array([1.0, 0.48, 0.12], dtype=np.float32)
+        else:
+            tint = np.array([1.0, 0.62, 0.14], dtype=np.float32)
+        src_col = np.stack([np.clip(r * 1.25, 0.0, 1.0), np.clip(g * 0.90, 0.0, 1.0), np.clip(b * 0.35, 0.0, 1.0)], axis=2)
+        emit_rgb = (0.55 * tint[None, None, :] + 0.45 * src_col) * ember_weight[:, :, None]
     emit_rgba = np.ones((h, w, 4), dtype=np.float32)
     emit_rgba[:, :, :3] = np.clip(emit_rgb, 0.0, 1.0)
 
@@ -550,12 +577,11 @@ def _measure_anatomical_landmarks(body: bpy.types.Object, height: float, split_m
     s = height / 1.95
     pts = [blender_to_godot(v.co) for v in body.data.vertices]
 
-    # Neck collar: scan downward looking for symmetric shoulder widening (skip wide kettle brims/horns on non-modular rigs).
+    # Neck collar: cap scan start at 0.85*H so wide horns/crowns above head line cannot trigger shoulder detection.
     y_neck = 1.56 * s
     step = 0.02 * s
     shoulder_half_w_thresh = 0.135 * s if split_modular else 0.175 * s
-    y_neck_max_frac = 0.86 if split_modular else 0.88
-    y_cur = (0.90 if split_modular else 0.92) * height
+    y_cur = min(0.85 * height, (0.90 if split_modular else 0.92) * height)
     while y_cur >= 0.65 * height:
         sl = [p for p in pts if y_cur - step <= p.y <= y_cur + step]
         if len(sl) >= 24:
@@ -565,7 +591,7 @@ def _measure_anatomical_landmarks(body: bpy.types.Object, height: float, split_m
                 y_neck = y_cur + 0.015 * s
                 break
         y_cur -= step
-    y_neck = max(0.72 * height, min(y_neck_max_frac * height, y_neck))
+    y_neck = max(0.70 * height, min(0.86 * height, y_neck))
 
     head_pts = [p for p in pts if p.y >= y_neck and abs(p.x) <= 0.14 * s]
     head_max_y = max((p.y for p in head_pts), default=height)
@@ -617,7 +643,8 @@ def _measure_anatomical_landmarks(body: bpy.types.Object, height: float, split_m
     torso_z = sum(p.z for p in torso_mid_pts) / len(torso_mid_pts) if torso_mid_pts else 0.0
 
     # Trace both arms inward from outer hand tips so torso/tassets never contaminate arm joints.
-    arm_band = [p for p in pts if 0.36 * height <= p.y <= y_neck + 0.02 * s]
+    arm_band_top = min(y_neck + 0.02 * s, 0.85 * height)
+    arm_band = [p for p in pts if 0.36 * height <= p.y <= arm_band_top]
     max_arm_x_l = max((p.x for p in arm_band), default=0.52 * s)
     max_arm_x_r = max((-p.x for p in arm_band), default=0.52 * s)
     max_arm_x = 0.5 * (max_arm_x_l + max_arm_x_r)
@@ -911,8 +938,13 @@ def _bind_body_weights(body: bpy.types.Object, arm_obj: bpy.types.Object, lm: di
     fallback_fixed = 0
     for v in mesh.vertices:
         gp = blender_to_godot(v.co)
-        # Keep metal helmet, horns, kettle brims & plume strictly rigid on head (widen above shoulder line).
-        allowed_head_w = max(head_half_w, 0.20 * s) if gp.y >= lm["y_neck"] + 0.04 * s else head_half_w
+        # Keep helmets, wide bull horns, crowns & plumes strictly rigid on head above shoulder line.
+        if gp.y >= lm["y_neck"] + 0.08 * s:
+            allowed_head_w = max(head_half_w, 0.42 * s)
+        elif gp.y >= lm["y_neck"] + 0.04 * s:
+            allowed_head_w = max(head_half_w, 0.20 * s)
+        else:
+            allowed_head_w = head_half_w
         if gp.y >= y_neck_cut and abs(gp.x) <= allowed_head_w:
             for g in list(v.groups):
                 body.vertex_groups[g.group].remove([v.index])
@@ -1573,8 +1605,19 @@ def main() -> None:
     dec_tris = _decimate_uv_preserving(body, args.target_tris)
     print(f"[rig_hunyuan] Decimated {raw_tris} -> {dec_tris} tris (target={args.target_tris})")
 
-    if args.extract_ember_emission in ("torso", "head"):
-        _extract_ember_emission_map(body, args.height, args.extract_ember_emission, strength=1.8)
+    emission_strengths = {
+        "torso": 1.8,
+        "head": 1.8,
+        "both": 2.2,
+        "blight": 2.0,
+    }
+    if args.extract_ember_emission in emission_strengths:
+        _extract_ember_emission_map(
+            body,
+            args.height,
+            args.extract_ember_emission,
+            strength=emission_strengths[args.extract_ember_emission],
+        )
 
     _prepare_textures_for_glb(
         albedo_max_res=args.albedo_max_res,

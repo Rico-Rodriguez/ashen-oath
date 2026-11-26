@@ -1,6 +1,7 @@
 shader_type spatial;
 render_mode unshaded, blend_mix, depth_draw_never, cull_disabled;
 
+uniform sampler2D noise_tex : filter_linear, repeat_enable;
 uniform bool billboard_mode = true;
 uniform vec3 core_hdr = vec3(6.2, 2.8, 0.62);
 uniform vec3 mid_flame = vec3(2.4, 0.55, 0.10);
@@ -12,34 +13,6 @@ uniform float alpha_boost = 1.22;
 
 varying float v_life;
 varying float v_seed;
-
-float hash12(vec2 p) {
-	vec3 p3 = fract(vec3(p.xyx) * 0.1031);
-	p3 += dot(p3, p3.yzx + 33.33);
-	return fract((p3.x + p3.y) * p3.z);
-}
-
-float noise2d(vec2 p) {
-	vec2 i = floor(p);
-	vec2 f = fract(p);
-	vec2 u = f * f * (3.0 - 2.0 * f);
-	return mix(
-		mix(hash12(i), hash12(i + vec2(1.0, 0.0)), u.x),
-		mix(hash12(i + vec2(0.0, 1.0)), hash12(i + vec2(1.0, 1.0)), u.x),
-		u.y
-	);
-}
-
-float fbm(vec2 p) {
-	float v = 0.0;
-	float a = 0.52;
-	for (int i = 0; i < 4; i++) {
-		v += noise2d(p) * a;
-		p = mat2(vec2(1.6, 1.2), vec2(-1.2, 1.6)) * p + vec2(13.7, 9.2);
-		a *= 0.5;
-	}
-	return v;
-}
 
 void vertex() {
 	v_life = clamp(INSTANCE_CUSTOM.y, 0.0, 1.0);
@@ -64,16 +37,18 @@ void vertex() {
 
 void fragment() {
 	float height_01 = 1.0 - UV.y;
-	vec2 warp_uv = UV * (noise_scale * 0.75) + vec2(v_seed * 5.1, TIME * scroll_speed * 0.85);
-	vec2 warp = vec2(fbm(warp_uv) - 0.5, fbm(warp_uv + vec2(4.3, 8.1)) - 0.5) * (0.22 + 0.24 * height_01);
+	vec2 warp_uv = UV * (noise_scale * 0.19) + vec2(v_seed * 0.37, TIME * scroll_speed * 0.21);
+	vec3 n_warp = texture(noise_tex, warp_uv).rgb;
+	vec2 warp = (n_warp.rb - vec2(0.5)) * (0.22 + 0.24 * height_01);
 
 	vec2 centered = (UV + warp * 0.55) - vec2(0.5, 0.55);
 	float pinch = mix(1.0, 1.75, height_01);
 	float dist = length(vec2(centered.x * pinch * 2.15, centered.y * 1.95));
 
-	vec2 n_uv = (UV + warp) * noise_scale + vec2(v_seed * 7.3, TIME * scroll_speed);
-	float turb = fbm(n_uv);
-	float wisps = noise2d(n_uv * 2.6 + vec2(-TIME * 1.4, TIME * 3.1));
+	vec2 n_uv = (UV + warp) * (noise_scale * 0.25) + vec2(v_seed * 0.53 - TIME * 0.08, TIME * scroll_speed * 0.25);
+	vec3 n_main = texture(noise_tex, n_uv).rgb;
+	float turb = n_main.r;
+	float wisps = n_main.g;
 
 	float shape = (1.0 - dist) + (turb - 0.48) * 0.86 + (wisps - 0.5) * 0.30;
 	float erode = mix(0.10, 0.62, v_life);

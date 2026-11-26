@@ -1,7 +1,7 @@
 [gd_scene load_steps=3 format=3]
 
 [ext_resource type="Script" path="res://scripts/actors/actor_visual.gd" id="1"]
-[ext_resource type="PackedScene" path="res://assets/models/heroes/boneknight/boneknight.tscn" id="2"]
+[ext_resource type="PackedScene" path="res://assets/models/kit/dread_revenant.glb" id="2"]
 
 [node name="Revenant" type="Node3D"]
 script = ExtResource("1")
@@ -13,7 +13,7 @@ yaw_offset_deg = 180.0
 armor_tier = 1
 weapon_key = "halberd"
 offhand_key = ""
-has_plume = true
+has_plume = false
 lantern_color = Color(0.95, 0.22, 0.24, 1)
 
 [node name="ModelPivot" type="Node3D" parent="."]

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://nwrf03q0s3au"
-path="res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.ctex"
+path.s3tc="res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.s3tc.ctex"
+path.etc2="res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "b8b325ef0e82c13c93356d3cdecfd5b1"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/runed_staff_Weapon_RunedStaff_PBR_Emission.webp"
-dest_files=["res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.ctex"]
+dest_files=["res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.s3tc.ctex", "res://.godot/imported/runed_staff_Weapon_RunedStaff_PBR_Emission.webp-788bf6294c5088b7765d460c058b40ea.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

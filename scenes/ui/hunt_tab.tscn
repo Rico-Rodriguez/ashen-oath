@@ -3,7 +3,8 @@
 [ext_resource type="Script" path="res://scripts/ui/hunt_tab.gd" id="1"]
 [ext_resource type="PackedScene" path="res://scenes/ui/sanctuary_stage_3d.tscn" id="2"]
 
-[node name="HuntTab" type="MarginContainer"]
+[node name="HuntTab" type="Control"]
+layout_mode = 3
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
@@ -11,22 +12,9 @@ grow_horizontal = 2
 grow_vertical = 2
 size_flags_horizontal = 3
 size_flags_vertical = 3
-theme_override_constants/margin_left = 12
-theme_override_constants/margin_top = 6
-theme_override_constants/margin_right = 12
-theme_override_constants/margin_bottom = 6
 script = ExtResource("1")
 
-[node name="VBox" type="VBoxContainer" parent="."]
-layout_mode = 2
-theme_override_constants/separation = 6
-
-[node name="StageFrame" type="Control" parent="VBox"]
-custom_minimum_size = Vector2(0, 520)
-layout_mode = 2
-size_flags_vertical = 3
-
-[node name="SanctuaryStage3D" parent="VBox/StageFrame" instance=ExtResource("2")]
+[node name="SanctuaryStage3D" parent="." instance=ExtResource("2")]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
@@ -34,48 +22,102 @@ anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
 
-[node name="HeroPlaque" type="PanelContainer" parent="VBox/StageFrame"]
+[node name="BottomScrim" type="TextureRect" parent="."]
 layout_mode = 1
-offset_left = 10.0
-offset_top = 10.0
-offset_right = 278.0
-offset_bottom = 58.0
+anchors_preset = -1
+anchor_top = 0.45
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
 mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
 
-[node name="PlaqueVBox" type="VBoxContainer" parent="VBox/StageFrame/HeroPlaque"]
+[node name="SafeOverlay" type="MarginContainer" parent="."]
+layout_mode = 1
+anchors_preset = 15
+anchor_right = 1.0
+anchor_bottom = 1.0
+grow_horizontal = 2
+grow_vertical = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 92
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 102
+
+[node name="OverlayVBox" type="VBoxContainer" parent="SafeOverlay"]
 layout_mode = 2
-theme_override_constants/separation = 1
 mouse_filter = 2
+theme_override_constants/separation = 8
 
-[node name="HeroNameLbl" type="Label" parent="VBox/StageFrame/HeroPlaque/PlaqueVBox"]
+[node name="HeroPlaqueVBox" type="VBoxContainer" parent="SafeOverlay/OverlayVBox"]
+layout_mode = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 4
+
+[node name="HeroNameLbl" type="Label" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox"]
 layout_mode = 2
 mouse_filter = 2
 text = "OATHBREAKER KNIGHT"
+horizontal_alignment = 1
 
-[node name="HeroSubLbl" type="Label" parent="VBox/StageFrame/HeroPlaque/PlaqueVBox"]
+[node name="HeroSubLbl" type="Label" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox"]
 layout_mode = 2
 mouse_filter = 2
 text = "Greatsword & Bulwark  ·  Hero Power 140"
+horizontal_alignment = 1
 
-[node name="HeroCardsRow" type="HBoxContainer" parent="VBox"]
+[node name="SkillBadgesCenter" type="CenterContainer" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox"]
 layout_mode = 2
-theme_override_constants/separation = 6
+mouse_filter = 2
 
-[node name="SkillRow" type="GridContainer" parent="VBox"]
+[node name="SkillBadgesRow" type="HBoxContainer" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox/SkillBadgesCenter"]
 layout_mode = 2
-theme_override_constants/h_separation = 6
-theme_override_constants/v_separation = 5
-columns = 2
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 12
 
-[node name="ZonesVBox" type="VBoxContainer" parent="VBox"]
+[node name="SkillTooltipPanel" type="PanelContainer" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox"]
+visible = false
 layout_mode = 2
-theme_override_constants/separation = 5
+size_flags_horizontal = 3
+mouse_filter = 2
 
-[node name="DiffRow" type="HBoxContainer" parent="VBox"]
+[node name="SkillTooltipLbl" type="Label" parent="SafeOverlay/OverlayVBox/HeroPlaqueVBox/SkillTooltipPanel"]
+layout_mode = 2
+mouse_filter = 2
+text = "Iron Tempest (7.0s) — Whirling dragging blade storm."
+horizontal_alignment = 1
+autowrap_mode = 3
+
+[node name="StageSpacer" type="Control" parent="SafeOverlay/OverlayVBox"]
+layout_mode = 2
+size_flags_vertical = 3
+mouse_filter = 2
+
+[node name="LowerDock" type="PanelContainer" parent="SafeOverlay/OverlayVBox"]
+layout_mode = 2
+
+[node name="DockVBox" type="VBoxContainer" parent="SafeOverlay/OverlayVBox/LowerDock"]
 layout_mode = 2
 theme_override_constants/separation = 8
 
-[node name="EmbarkBtn" type="Button" parent="VBox"]
-custom_minimum_size = Vector2(0, 64)
+[node name="HeroCardsRow" type="HBoxContainer" parent="SafeOverlay/OverlayVBox/LowerDock/DockVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="ZonesVBox" type="VBoxContainer" parent="SafeOverlay/OverlayVBox/LowerDock/DockVBox"]
+layout_mode = 2
+theme_override_constants/separation = 6
+
+[node name="DiffRow" type="HBoxContainer" parent="SafeOverlay/OverlayVBox/LowerDock/DockVBox"]
+layout_mode = 2
+theme_override_constants/separation = 8
+
+[node name="EmbarkBtn" type="Button" parent="SafeOverlay/OverlayVBox/LowerDock/DockVBox"]
+custom_minimum_size = Vector2(0, 88)
 layout_mode = 2
 text = "EMBARK ON HUNT"

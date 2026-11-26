@@ -3,6 +3,8 @@ extends RefCounted
 
 const ARMOR_SHADER_PATH := "res://shaders/armor_forge.gdshader"
 const CLOAK_SHADER_PATH := "res://shaders/cloak_sway.gdshader"
+const DISCARD_SHADER_PATH := "res://shaders/discard_alpha.gdshader"
+const ARMOR_VORONOI_TEX_PATH := "res://assets/textures/armor_voronoi_tile.png"
 const WAIST_LANTERN_PATH := "res://assets/models/forged/waist_lantern.glb"
 const CLOAK_TATTERED_PATH := "res://assets/models/forged/cloak_tattered.glb"
 const HELM_PLUME_PATH := "res://assets/models/forged/helm_plume.glb"
@@ -176,12 +178,13 @@ const CLASS_BONES := {
 }
 
 const CLASS_CLOAK_COLORS := {
-	"oathbreaker": Color(0.085, 0.080, 0.095),
-	"battlemage": Color(0.08, 0.095, 0.125),
-	"revenant": Color(0.085, 0.072, 0.098),
+	"oathbreaker": Color(0.11, 0.12, 0.16),
+	"battlemage": Color(0.08, 0.10, 0.17),
+	"revenant": Color(0.24, 0.04, 0.05),
 }
 
 static var _discard_mat: ShaderMaterial = null
+static var _voronoi_tex: Texture2D = null
 
 
 static func dress(
@@ -515,10 +518,12 @@ static func _style_modular_mesh(
 	for s in mi.mesh.get_surface_count():
 		var orig_mat := mi.get_active_material(s)
 		if kind == "cloak" and cloak_shader != null:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var cmat := _make_cloak_shader_mat(cloak_shader, pal["cape_base"], pal["cape_trim"], 0.085)
 			mi.set_surface_override_material(s, cmat)
 			cloth_mats.append(cmat)
 		elif kind == "plume" and cloak_shader != null:
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			var pmat := _make_cloak_shader_mat(cloak_shader, pal["plume_col"], (pal["plume_col"] as Color).darkened(0.28), 0.035)
 			mi.set_surface_override_material(s, pmat)
 			cloth_mats.append(pmat)
@@ -535,10 +540,10 @@ static func _style_modular_mesh(
 
 static func _get_discard_mat() -> ShaderMaterial:
 	if _discard_mat == null:
-		var sh := Shader.new()
-		sh.code = "shader_type spatial;\nrender_mode cull_disabled, depth_draw_never;\nvoid fragment() { discard; }\n"
+		var sh := load(DISCARD_SHADER_PATH) as Shader
 		_discard_mat = ShaderMaterial.new()
-		_discard_mat.shader = sh
+		if sh != null:
+			_discard_mat.shader = sh
 	return _discard_mat
 
 
@@ -1070,6 +1075,7 @@ static func _mount_cloak(
 	var smat := _make_cloak_shader_mat(cloak_shader, pal["cape_base"], pal["cape_trim"], 0.09)
 	for n in inst.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.mesh != null:
 			for s in mi.mesh.get_surface_count():
 				mi.set_surface_override_material(s, smat)
@@ -1120,6 +1126,7 @@ static func _mount_plume(
 	var smat := _make_cloak_shader_mat(cloak_shader, pcol, pcol.darkened(0.32), 0.055)
 	for n in inst.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.mesh == null:
 			continue
 		for s in mi.mesh.get_surface_count():
@@ -1184,6 +1191,7 @@ static func _tint_lantern_core(root_node: Node3D, lantern_color: Color, energy: 
 	for n in root_node.find_children("*", "MeshInstance3D", true, false):
 		meshes.append(n as MeshInstance3D)
 	for mi in meshes:
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.mesh == null:
 			continue
 		for s in mi.mesh.get_surface_count():
@@ -1284,6 +1292,7 @@ static func _dress_unified_kit(
 		if slot_key == "plume":
 			has_slot_plume = true
 			mi.visible = has_plume
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			if cloak_shader != null:
 				var pmat := _make_cloak_shader_mat(cloak_shader, plume_col, plume_col.darkened(0.28), 0.035, -1.0)
 				for s in mi.mesh.get_surface_count():
@@ -1293,6 +1302,7 @@ static func _dress_unified_kit(
 		if slot_key == "cloak":
 			has_builtin_cloak = true
 			mi.visible = true
+			mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 			if cloak_shader != null:
 				var cmat := _make_cloak_shader_mat(cloak_shader, cape_base, cape_trim, 0.085, -1.0)
 				for s in mi.mesh.get_surface_count():
@@ -1397,7 +1407,7 @@ static func _dress_unified_kit(
 			if equip_modular_slot(visual, slot_name, ov_val, cuirass_tier) and slot_name == "cloak":
 				has_builtin_cloak = true
 
-	if replaced_helm:
+	if replaced_helm or helm_key != "":
 		for pmi in _find_slot_meshes(visual.model_instance, "Slot_Plume"):
 			pmi.visible = false
 	elif has_plume and not has_slot_plume:
@@ -1589,6 +1599,7 @@ static func _mount_unified_cloak(
 	var smat := _make_cloak_shader_mat(cloak_shader, pal["cape_base"], pal["cape_trim"], 0.085)
 	for n in inst.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.mesh != null:
 			for s in mi.mesh.get_surface_count():
 				mi.set_surface_override_material(s, smat)
@@ -1629,6 +1640,7 @@ static func _mount_unified_plume(
 	var smat := _make_cloak_shader_mat(cloak_shader, pcol, pcol.darkened(0.30), 0.05)
 	for n in inst.find_children("*", "MeshInstance3D", true, false):
 		var mi := n as MeshInstance3D
+		mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
 		if mi.mesh == null:
 			continue
 		for s in mi.mesh.get_surface_count():
@@ -1702,6 +1714,10 @@ static func _make_armor_shader_mat(shader: Shader, orig_mat: Material, tier: int
 	smat.set_shader_parameter("armor_tier", tier)
 	smat.set_shader_parameter("is_armor_plate", is_plate)
 	smat.set_shader_parameter("hit_flash", 0.0)
+	if _voronoi_tex == null and ResourceLoader.exists(ARMOR_VORONOI_TEX_PATH):
+		_voronoi_tex = load(ARMOR_VORONOI_TEX_PATH) as Texture2D
+	if _voronoi_tex != null:
+		smat.set_shader_parameter("voronoi_tex", _voronoi_tex)
 	if orig_mat is StandardMaterial3D:
 		var std := orig_mat as StandardMaterial3D
 		smat.set_shader_parameter("albedo_color", std.albedo_color)

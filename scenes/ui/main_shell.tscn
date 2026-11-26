@@ -35,96 +35,154 @@ anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-color = Color(0.043, 0.051, 0.067, 1)
+color = Color(0.035, 0.04, 0.055, 1)
 
-[node name="HubVBox" type="VBoxContainer" parent="HubLayer"]
+[node name="TabStack" type="Control" parent="HubLayer"]
 layout_mode = 1
 anchors_preset = 15
 anchor_right = 1.0
 anchor_bottom = 1.0
 grow_horizontal = 2
 grow_vertical = 2
-theme_override_constants/separation = 0
 
-[node name="HeaderPanel" type="PanelContainer" parent="HubLayer/HubVBox"]
-custom_minimum_size = Vector2(0, 58)
-layout_mode = 2
+[node name="HuntTab" parent="HubLayer/TabStack" instance=ExtResource("3")]
+layout_mode = 1
 
-[node name="HeaderRow" type="HBoxContainer" parent="HubLayer/HubVBox/HeaderPanel"]
+[node name="ArmoryTab" parent="HubLayer/TabStack" instance=ExtResource("4")]
+visible = false
+layout_mode = 1
+
+[node name="ForgeTab" parent="HubLayer/TabStack" instance=ExtResource("5")]
+visible = false
+layout_mode = 1
+
+[node name="TopScrim" type="TextureRect" parent="HubLayer"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 160.0
+grow_horizontal = 2
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 0
+
+[node name="HeaderOverlay" type="MarginContainer" parent="HubLayer"]
+layout_mode = 1
+anchors_preset = 10
+anchor_right = 1.0
+offset_bottom = 84.0
+grow_horizontal = 2
+mouse_filter = 2
+theme_override_constants/margin_left = 14
+theme_override_constants/margin_top = 12
+theme_override_constants/margin_right = 14
+theme_override_constants/margin_bottom = 4
+
+[node name="HeaderRow" type="HBoxContainer" parent="HubLayer/HeaderOverlay"]
 layout_mode = 2
+mouse_filter = 2
+alignment = 1
 theme_override_constants/separation = 8
 
-[node name="BrandLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+[node name="BrandLbl" type="Label" parent="HubLayer/HeaderOverlay/HeaderRow"]
 layout_mode = 2
 size_flags_horizontal = 3
+size_flags_vertical = 4
+mouse_filter = 2
 text = "ASHEN OATH"
+vertical_alignment = 1
 
-[node name="PowerPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+[node name="PowerPill" type="PanelContainer" parent="HubLayer/HeaderOverlay/HeaderRow"]
 layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
 
-[node name="PowerLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/PowerPill"]
+[node name="PowerLbl" type="Label" parent="HubLayer/HeaderOverlay/HeaderRow/PowerPill"]
 layout_mode = 2
+mouse_filter = 2
 text = "PWR 140"
 
-[node name="GoldPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+[node name="GoldPill" type="PanelContainer" parent="HubLayer/HeaderOverlay/HeaderRow"]
 layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
 
-[node name="GoldLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/GoldPill"]
+[node name="GoldRow" type="HBoxContainer" parent="HubLayer/HeaderOverlay/HeaderRow/GoldPill"]
 layout_mode = 2
-text = "Gold 120"
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 5
 
-[node name="ScrapPill" type="PanelContainer" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
+[node name="GoldIcon" type="TextureRect" parent="HubLayer/HeaderOverlay/HeaderRow/GoldPill/GoldRow"]
+custom_minimum_size = Vector2(20, 20)
 layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
 
-[node name="ScrapLbl" type="Label" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow/ScrapPill"]
+[node name="GoldLbl" type="Label" parent="HubLayer/HeaderOverlay/HeaderRow/GoldPill/GoldRow"]
 layout_mode = 2
-text = "Scrap 24"
+mouse_filter = 2
+text = "120"
 
-[node name="SettingsBtn" type="Button" parent="HubLayer/HubVBox/HeaderPanel/HeaderRow"]
-custom_minimum_size = Vector2(40, 38)
+[node name="ScrapPill" type="PanelContainer" parent="HubLayer/HeaderOverlay/HeaderRow"]
 layout_mode = 2
-text = "CFG"
+size_flags_vertical = 4
+mouse_filter = 2
 
-[node name="TabStack" type="Control" parent="HubLayer/HubVBox"]
+[node name="ScrapRow" type="HBoxContainer" parent="HubLayer/HeaderOverlay/HeaderRow/ScrapPill"]
 layout_mode = 2
-size_flags_vertical = 3
+mouse_filter = 2
+alignment = 1
+theme_override_constants/separation = 5
 
-[node name="HuntTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("3")]
+[node name="ScrapIcon" type="TextureRect" parent="HubLayer/HeaderOverlay/HeaderRow/ScrapPill/ScrapRow"]
+custom_minimum_size = Vector2(20, 20)
+layout_mode = 2
+size_flags_vertical = 4
+mouse_filter = 2
+expand_mode = 1
+stretch_mode = 5
+
+[node name="ScrapLbl" type="Label" parent="HubLayer/HeaderOverlay/HeaderRow/ScrapPill/ScrapRow"]
+layout_mode = 2
+mouse_filter = 2
+text = "24"
+
+[node name="SettingsBtn" type="Button" parent="HubLayer/HeaderOverlay/HeaderRow"]
+custom_minimum_size = Vector2(72, 72)
+layout_mode = 2
+size_flags_vertical = 4
+
+[node name="NavDockPanel" type="PanelContainer" parent="HubLayer"]
 layout_mode = 1
+anchors_preset = 12
+anchor_top = 1.0
+anchor_right = 1.0
+anchor_bottom = 1.0
+offset_top = -94.0
+grow_horizontal = 2
+grow_vertical = 0
 
-[node name="ArmoryTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("4")]
-visible = false
-layout_mode = 1
-
-[node name="ForgeTab" parent="HubLayer/HubVBox/TabStack" instance=ExtResource("5")]
-visible = false
-layout_mode = 1
-
-[node name="NavDockPanel" type="PanelContainer" parent="HubLayer/HubVBox"]
-custom_minimum_size = Vector2(0, 68)
-layout_mode = 2
-
-[node name="NavRow" type="HBoxContainer" parent="HubLayer/HubVBox/NavDockPanel"]
+[node name="NavRow" type="HBoxContainer" parent="HubLayer/NavDockPanel"]
 layout_mode = 2
 theme_override_constants/separation = 10
 
-[node name="NavSanctumBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
-custom_minimum_size = Vector2(0, 50)
+[node name="NavSanctumBtn" type="Button" parent="HubLayer/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "SANCTUM"
 
-[node name="NavArmoryBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
-custom_minimum_size = Vector2(0, 50)
+[node name="NavArmoryBtn" type="Button" parent="HubLayer/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "ARMORY"
 
-[node name="NavForgeBtn" type="Button" parent="HubLayer/HubVBox/NavDockPanel/NavRow"]
-custom_minimum_size = Vector2(0, 50)
+[node name="NavForgeBtn" type="Button" parent="HubLayer/NavDockPanel/NavRow"]
+custom_minimum_size = Vector2(0, 78)
 layout_mode = 2
 size_flags_horizontal = 3
-text = "FORGE & LORE"
 
 [node name="SettingsModal" parent="HubLayer" instance=ExtResource("6")]
 layout_mode = 1

@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://6kg32clcn7rj"
-path="res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.ctex"
+path.s3tc="res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.s3tc.ctex"
+path.etc2="res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "6a63c9aa7237cc63018ed6662008b38c"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp"
-dest_files=["res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.ctex"]
+dest_files=["res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.s3tc.ctex", "res://.godot/imported/warden_greatsword_Weapon_WardenGreatsword_PBR_Emission.webp-5314307bd06510fc340ccb67f633025f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

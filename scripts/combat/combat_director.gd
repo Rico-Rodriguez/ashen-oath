@@ -7,10 +7,14 @@ signal damage_floated(world_pos: Vector3, amount: int, is_crit: bool, is_hero_hu
 signal shrine_offered(choices: Array[ShrineBlessingDef])
 signal run_completed(victory: bool, summary: Dictionary)
 
-const CAMERA_FOV_DEG: float = 42.0
-const CAMERA_PITCH_DEG: float = 43.0
-const CAMERA_DIST_NORMAL: float = 12.8
-const CAMERA_DIST_BOSS: float = 15.2
+const CAMERA_FOV_DEG: float = 56.0
+const CAMERA_PITCH_DEG: float = 54.0
+const CAMERA_DIST_NORMAL: float = 17.8
+const CAMERA_DIST_BOSS: float = 20.5
+const CAMERA_FOCUS_OFFSET := Vector3(0.0, 0.72, -1.9)
+const HITSTOP_COOLDOWN_SEC: float = 0.38
+const HITSTOP_TIME_SCALE: float = 0.25
+const HITSTOP_DEFAULT_DURATION: float = 0.028
 
 @export var auto_start_from_game_state: bool = false
 
@@ -45,10 +49,16 @@ var total_damage_dealt: float = 0.0
 var run_elapsed_sec: float = 0.0
 
 var _enemies: Array[EnemyController3D] = []
+var _alive_enemies_cache: Array[EnemyController3D] = []
+var _alive_cache_tick: int = -1
+var _alive_cache_source_size: int = -1
+var _alive_cache_dirty: bool = true
 var _clearings: Array[Dictionary] = []
 var _all_clearings_cleared: bool = false
 var _boss_spawned: bool = false
 var _boss_fight_active: bool = false
+var _boss_gate_arch_hidden: bool = false
+var _boss_entry_radius: float = 14.0
 var _pending_end_timer: float = -1.0
 var _pending_victory: bool = false
 
@@ -60,6 +70,7 @@ var _camera_trauma: float = 0.0
 var _shake_time: float = 0.0
 var _hud_emit_accum: float = 0.0
 var _hitstop_end_usec: int = 0
+var _hitstop_cd_timer: float = 0.0
 
 
 func _ready() -> void:
@@ -122,14 +133,18 @@ func start_run(
 	_all_clearings_cleared = false
 	_boss_spawned = false
 	_boss_fight_active = false
+	_boss_gate_arch_hidden = false
+	_boss_entry_radius = 14.0
 	_pending_end_timer = -1.0
 	_pending_victory = false
 	_camera_trauma = 0.0
+	_hitstop_cd_timer = 0.0
 
 	var vfx_mgr := VfxManager.new()
 	vfx_mgr.name = "VfxManager"
 	vfx_root.add_child(vfx_mgr)
 	vfx = vfx_mgr
+	VfxManager.prewarm_shaders(vfx_root)
 	arena_layout = BarrowArenaBuilder.build_zone(arena_root, zone_def, int(rng.seed))
 	_init_clearings_from_layout()
 
@@ -174,27 +189,33 @@ func start_run(
 	hud_updated.emit(get_hud_state())
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if _hitstop_end_usec > 0 and Time.get_ticks_usec() >= _hitstop_end_usec:
 		_hitstop_end_usec = 0
 		Engine.time_scale = 1.0
+	var unscaled_dt := minf(delta / maxf(Engine.time_scale, 0.05), 0.1)
+	if _hitstop_cd_timer > 0.0:
+		_hitstop_cd_timer = maxf(0.0, _hitstop_cd_timer - unscaled_dt)
+	if run_started:
+		_update_camera(minf(delta, 0.05))
 
 
 func _physics_process(delta: float) -> void:
 	if not run_started:
 		return
+	_refresh_alive_enemies_cache()
 
 	if not is_shrine_open and not run_finished:
 		run_elapsed_sec += delta
 		_check_clearing_activations()
 		_check_boss_trigger()
+		_tick_boss_entry_radius(delta)
+		_update_boss_gate_sightline()
 
 	if _pending_end_timer >= 0.0 and not run_finished:
 		_pending_end_timer -= delta
 		if _pending_end_timer <= 0.0:
 			finalize_pending_run()
-
-	_update_camera(delta)
 
 	_hud_emit_accum += delta
 	if _hud_emit_accum >= 0.10:
@@ -288,6 +309,7 @@ func spawn_enemy_at(
 	enemy.died.connect(_on_enemy_died)
 	enemy.took_damage.connect(_on_enemy_took_damage)
 	_enemies.append(enemy)
+	_alive_cache_dirty = true
 	return enemy
 
 
@@ -310,11 +332,18 @@ func spawn_boss_encounter() -> EnemyController3D:
 	_boss_spawned = true
 	_boss_fight_active = true
 
-	var boss_center: Vector3 = arena_layout.get("boss_center", Vector3(0.0, 0.0, -44.0))
+	var boss_center: Vector3 = arena_layout.get("boss_center", Vector3(0.0, 0.0, -45.0))
+	var b_rad := float(arena_layout.get("boss_radius", 14.0))
+	_boss_entry_radius = b_rad
 	var spawn_p := Vector3(boss_center.x, 0.0, boss_center.z)
 	if hero != null and is_instance_valid(hero):
+		var hero_rel := Vector2(hero.global_position.x - boss_center.x, hero.global_position.z - boss_center.z).length()
+		if hero_rel > b_rad:
+			_boss_entry_radius = hero_rel
 		if Vector2(hero.global_position.x - spawn_p.x, hero.global_position.z - spawn_p.z).length() < 3.5:
 			spawn_p.z -= 5.0
+
+	_update_boss_gate_sightline()
 
 	active_boss = spawn_enemy_at(zone_def.boss_id, spawn_p, false, -1, false)
 	active_boss.state = EnemyController3D.State.CHASE
@@ -337,21 +366,106 @@ func spawn_boss_encounter() -> EnemyController3D:
 	return active_boss
 
 
-func get_alive_enemies() -> Array[EnemyController3D]:
-	var out: Array[EnemyController3D] = []
+func _refresh_alive_enemies_cache() -> void:
+	var next_alive: Array[EnemyController3D] = []
 	var i := _enemies.size() - 1
 	while i >= 0:
 		var e := _enemies[i]
 		if e == null or not is_instance_valid(e):
 			_enemies.remove_at(i)
 		elif not e.is_dead():
-			out.append(e)
+			next_alive.append(e)
 		i -= 1
-	return out
+	# Swap snapshot reference instead of mutating in place so active iterators stay safe.
+	_alive_enemies_cache = next_alive
+	_alive_cache_tick = Engine.get_physics_frames()
+	_alive_cache_source_size = _enemies.size()
+	_alive_cache_dirty = false
+
+
+func get_alive_enemies() -> Array[EnemyController3D]:
+	var cur_tick := Engine.get_physics_frames()
+	if _alive_cache_dirty or _alive_cache_tick != cur_tick or _alive_cache_source_size != _enemies.size():
+		_refresh_alive_enemies_cache()
+		return _alive_enemies_cache
+	for e in _alive_enemies_cache:
+		if e == null or not is_instance_valid(e) or e.is_dead():
+			_refresh_alive_enemies_cache()
+			break
+	return _alive_enemies_cache
 
 
 func get_camera() -> Camera3D:
 	return run_camera
+
+
+func get_hud_tracked_enemies() -> Array:
+	var tracked: Array = []
+	for e in get_alive_enemies():
+		if e == active_boss or (e.enemy_def != null and e.enemy_def.is_boss):
+			continue
+		if e.is_elite or e.current_hp < e.max_hp - 0.5:
+			tracked.append(e)
+	if tracked.size() > 1 and hero != null and is_instance_valid(hero):
+		var hpos := hero.global_position
+		tracked.sort_custom(func(a: EnemyController3D, b: EnemyController3D) -> bool:
+			if a.is_elite != b.is_elite:
+				return a.is_elite
+			var da := Vector2(a.global_position.x - hpos.x, a.global_position.z - hpos.z).length_squared()
+			var db := Vector2(b.global_position.x - hpos.x, b.global_position.z - hpos.z).length_squared()
+			return da < db
+		)
+	return tracked
+
+
+func get_objective_target_world_pos() -> Vector3:
+	if _boss_fight_active and active_boss != null and is_instance_valid(active_boss) and not active_boss.is_dead():
+		return active_boss.global_position
+
+	var ref_pos := hero.global_position if hero != null and is_instance_valid(hero) else Vector3.ZERO
+	var alive := get_alive_enemies()
+	if not alive.is_empty():
+		var best_e: EnemyController3D = null
+		var best_d_sq := INF
+		for e in alive:
+			var d_sq := Vector2(e.global_position.x - ref_pos.x, e.global_position.z - ref_pos.z).length_squared()
+			if d_sq < best_d_sq:
+				best_d_sq = d_sq
+				best_e = e
+		if best_e != null:
+			return best_e.global_position
+
+	var shrine_available := dark_shrine != null and is_instance_valid(dark_shrine) and not dark_shrine.is_consumed
+	var gate_z := float(arena_layout.get("boss_gate_z", -32.0))
+	var gate_target := Vector3(0.0, 0.0, gate_z - 2.0)
+
+	if not _all_clearings_cleared:
+		var next_clearing := Vector3.ZERO
+		var found_clearing := false
+		var best_cl_d_sq := INF
+		for c in _clearings:
+			if bool(c["cleared"]):
+				continue
+			var cp: Vector3 = c["center"]
+			var d_sq := Vector2(cp.x - ref_pos.x, cp.z - ref_pos.z).length_squared()
+			if d_sq < best_cl_d_sq:
+				best_cl_d_sq = d_sq
+				next_clearing = cp
+				found_clearing = true
+		if shrine_available:
+			var sd_sq := Vector2(dark_shrine.global_position.x - ref_pos.x, dark_shrine.global_position.z - ref_pos.z).length_squared()
+			if not found_clearing or sd_sq < best_cl_d_sq:
+				return dark_shrine.global_position
+		if found_clearing:
+			return next_clearing
+
+	if shrine_available:
+		var sd_sq := Vector2(dark_shrine.global_position.x - ref_pos.x, dark_shrine.global_position.z - ref_pos.z).length_squared()
+		var gd_sq := Vector2(gate_target.x - ref_pos.x, gate_target.z - ref_pos.z).length_squared()
+		if sd_sq < gd_sq:
+			return dark_shrine.global_position
+
+	return gate_target
 
 
 func get_hud_state() -> Dictionary:
@@ -408,8 +522,8 @@ func clamp_arena_position(pos: Vector3) -> Vector3:
 	elif _boss_fight_active:
 		if out.z > gate_z - 0.5:
 			out.z = gate_z - 0.5
-		var b_center: Vector3 = arena_layout.get("boss_center", Vector3(0.0, 0.0, -44.0))
-		var b_rad := float(arena_layout.get("boss_radius", 14.0))
+		var b_center: Vector3 = arena_layout.get("boss_center", Vector3(0.0, 0.0, -45.0))
+		var b_rad := maxf(float(arena_layout.get("boss_radius", 14.0)), _boss_entry_radius)
 		var rel := Vector2(out.x - b_center.x, out.z - b_center.z)
 		if rel.length() > b_rad:
 			rel = rel.normalized() * b_rad
@@ -435,13 +549,14 @@ func add_camera_kick(dir: Vector3, strength: float = 0.24) -> void:
 		_cam_kick = (_cam_kick + flat.normalized() * strength).limit_length(0.55)
 
 
-func trigger_hitstop(duration_sec: float = 0.036) -> void:
+func trigger_hitstop(duration_sec: float = HITSTOP_DEFAULT_DURATION) -> void:
 	if DisplayServer.get_name() == "headless":
 		return
-	if is_shrine_open or run_finished or Engine.time_scale > 1.2 or _hitstop_end_usec > 0:
+	if is_shrine_open or run_finished or Engine.time_scale > 1.2 or _hitstop_end_usec > 0 or _hitstop_cd_timer > 0.0:
 		return
-	_hitstop_end_usec = Time.get_ticks_usec() + roundi(clampf(duration_sec, 0.012, 0.075) * 1_000_000.0)
-	Engine.time_scale = 0.08
+	_hitstop_cd_timer = HITSTOP_COOLDOWN_SEC
+	_hitstop_end_usec = Time.get_ticks_usec() + roundi(clampf(duration_sec, 0.012, 0.036) * 1_000_000.0)
+	Engine.time_scale = HITSTOP_TIME_SCALE
 
 
 func notify_heal_floated(world_pos: Vector3, amount: int) -> void:
@@ -560,15 +675,44 @@ func _check_boss_trigger() -> void:
 		return
 	if bool(arena_layout.get("boss_gate_locked", false)):
 		return
-	var gate_z := float(arena_layout.get("boss_gate_z", -28.0))
-	var trigger_z := minf(-33.0, gate_z - 0.8)
-	if hero.global_position.z < trigger_z:
+	var gate_z := float(arena_layout.get("boss_gate_z", -32.0))
+	var trigger_z := minf(-33.5, gate_z - 1.5)
+	if hero.global_position.z <= trigger_z:
 		spawn_boss_encounter()
+
+
+func _tick_boss_entry_radius(delta: float) -> void:
+	if not _boss_fight_active or hero == null or not is_instance_valid(hero):
+		return
+	var b_rad := float(arena_layout.get("boss_radius", 14.0))
+	if _boss_entry_radius <= b_rad:
+		return
+	var b_center: Vector3 = arena_layout.get("boss_center", Vector3(0.0, 0.0, -45.0))
+	var hero_rel := Vector2(hero.global_position.x - b_center.x, hero.global_position.z - b_center.z).length()
+	_boss_entry_radius = minf(_boss_entry_radius, maxf(b_rad, hero_rel))
+	_boss_entry_radius = move_toward(_boss_entry_radius, b_rad, 4.5 * delta)
+
+
+func _update_boss_gate_sightline() -> void:
+	if hero == null or not is_instance_valid(hero):
+		return
+	var should_hide := _boss_fight_active or hero.global_position.z < -31.5
+	if should_hide == _boss_gate_arch_hidden:
+		return
+	_boss_gate_arch_hidden = should_hide
+	var cb: Variant = arena_layout.get("set_boss_gate_arch_visible")
+	if cb is Callable and (cb as Callable).is_valid():
+		(cb as Callable).call(not should_hide)
+	elif arena_root != null:
+		var arch_vis := arena_root.get_node_or_null("BossGate/GateArchVisuals") as Node3D
+		if arch_vis != null:
+			arch_vis.visible = not should_hide
 
 
 func _on_enemy_died(enemy: EnemyController3D) -> void:
 	if enemy == null:
 		return
+	_alive_cache_dirty = true
 	enemies_slain += 1
 
 	if enemy == active_boss:
@@ -595,9 +739,25 @@ func _on_enemy_died(enemy: EnemyController3D) -> void:
 
 
 func _handle_boss_slain(boss: EnemyController3D) -> void:
-	for e in get_alive_enemies():
-		if e != boss and e.is_boss_summon:
+	if hero != null and is_instance_valid(hero) and not hero.is_dead():
+		hero.grant_iframes(5.0)
+
+	for e in get_alive_enemies().duplicate():
+		if e != boss and is_instance_valid(e):
 			e.kill_silently()
+	_alive_cache_dirty = true
+
+	if projectiles_root != null:
+		for proj in projectiles_root.get_children():
+			if proj != null and is_instance_valid(proj):
+				proj.set_physics_process(false)
+				proj.visible = false
+				proj.queue_free()
+
+	if drops_root != null:
+		for ch in drops_root.get_children():
+			if ch is LootDrop3D:
+				(ch as LootDrop3D).force_vacuum = true
 
 	boss_updated.emit(boss.enemy_def.display_name, boss.enemy_def.title, 0.0, boss.max_hp, boss.is_enraged)
 
@@ -680,7 +840,7 @@ func _on_hero_health_changed(_hp: float, _mhp: float, _ward: float) -> void:
 
 
 func _on_hero_died() -> void:
-	if run_finished or _pending_end_timer >= 0.0:
+	if run_finished or _pending_end_timer >= 0.0 or _pending_victory:
 		return
 	var ad := _audio()
 	if ad != null and ad.has_method("sting"):
@@ -719,10 +879,11 @@ func _snap_camera_to_hero() -> void:
 	if run_camera == null or hero == null:
 		return
 	run_camera.fov = CAMERA_FOV_DEG
+	run_camera.far = 75.0
 	run_camera.rotation_degrees = Vector3(-CAMERA_PITCH_DEG, 0.0, 0.0)
 	_cam_lead = Vector3.ZERO
 	_cam_kick = Vector3.ZERO
-	_cam_focus = hero.global_position + Vector3(0.0, 0.95, -0.55)
+	_cam_focus = hero.global_position + CAMERA_FOCUS_OFFSET
 	var pitch_rad := deg_to_rad(CAMERA_PITCH_DEG)
 	var offset := Vector3(0.0, sin(pitch_rad), cos(pitch_rad)) * _cam_dist
 	run_camera.global_position = _cam_focus + offset
@@ -735,12 +896,18 @@ func _update_camera(delta: float) -> void:
 	var target_dist := CAMERA_DIST_BOSS if _boss_fight_active else CAMERA_DIST_NORMAL
 	_cam_dist = lerpf(_cam_dist, target_dist, 1.0 - exp(-5.5 * delta))
 
+	var hero_pos := hero.get_global_transform_interpolated().origin if hero.is_inside_tree() else hero.global_position
 	var vel_xz := Vector3(hero.velocity.x, 0.0, hero.velocity.z)
-	var target_lead := vel_xz.limit_length(5.5) * 0.22
+	var target_lead := vel_xz.limit_length(5.5) * 0.12
 	_cam_lead = _cam_lead.lerp(target_lead, 1.0 - exp(-6.5 * delta))
 	_cam_kick = _cam_kick.lerp(Vector3.ZERO, 1.0 - exp(-18.0 * delta))
 
-	var desired_focus := hero.global_position + Vector3(0.0, 0.95, -0.55) + _cam_lead + _cam_kick
+	var boss_pull := Vector3.ZERO
+	if _boss_fight_active and active_boss != null and is_instance_valid(active_boss) and not active_boss.is_dead():
+		var boss_pos := active_boss.get_global_transform_interpolated().origin if active_boss.is_inside_tree() else active_boss.global_position
+		boss_pull = (Vector3(boss_pos.x - hero_pos.x, 0.0, boss_pos.z - hero_pos.z) * 0.22).limit_length(3.2)
+
+	var desired_focus := hero_pos + CAMERA_FOCUS_OFFSET + boss_pull + _cam_lead + _cam_kick
 	var alpha := 1.0 - exp(-14.0 * delta)
 	_cam_focus = _cam_focus.lerp(desired_focus, alpha)
 
@@ -805,6 +972,10 @@ func _ensure_scene_nodes() -> void:
 		run_camera.fov = CAMERA_FOV_DEG
 		run_camera.current = true
 		add_child(run_camera)
+	run_camera.fov = CAMERA_FOV_DEG
+	run_camera.far = 75.0
+	# Camera tracks interpolated hero transforms in _process; disable physics interpolation on the camera itself to avoid double-buffering jitter.
+	run_camera.physics_interpolation_mode = Node.PHYSICS_INTERPOLATION_MODE_OFF
 
 
 func _ensure_group_node(node_name: String) -> Node3D:
@@ -820,12 +991,19 @@ func _clear_run_world() -> void:
 	if _hitstop_end_usec > 0:
 		_hitstop_end_usec = 0
 		Engine.time_scale = 1.0
+	_hitstop_cd_timer = 0.0
+	_boss_gate_arch_hidden = false
+	_boss_entry_radius = 14.0
 	hero = null
 	active_boss = null
 	dark_shrine = null
 	vfx = null
 	arena_layout.clear()
 	_enemies.clear()
+	_alive_enemies_cache = []
+	_alive_cache_tick = -1
+	_alive_cache_source_size = -1
+	_alive_cache_dirty = true
 	_clearings.clear()
 	for container in [arena_root, actors_root, projectiles_root, drops_root, vfx_root]:
 		if container == null:

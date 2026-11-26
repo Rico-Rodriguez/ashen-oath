@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://bh6fdltgmcpvj"
-path="res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.ctex"
+path.s3tc="res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.s3tc.ctex"
+path.etc2="res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "bcfc8283288e3a82a9d87b59c987466e"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/waist_lantern_Forged_WaistLantern_PBR_Emission.webp"
-dest_files=["res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.ctex"]
+dest_files=["res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.s3tc.ctex", "res://.godot/imported/waist_lantern_Forged_WaistLantern_PBR_Emission.webp-893be2424d429a7d009e960ce5affaae.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

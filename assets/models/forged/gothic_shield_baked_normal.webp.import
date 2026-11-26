@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cduvj2bbiygea"
-path="res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.ctex"
+path.s3tc="res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.s3tc.ctex"
+path.etc2="res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "fe386da0e4cc4090740992a93ab4dd21"
@@ -14,17 +16,17 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/gothic_shield_baked_normal.webp"
-dest_files=["res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.ctex"]
+dest_files=["res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.s3tc.ctex", "res://.godot/imported/gothic_shield_baked_normal.webp-ee6e02726dcfba213f3b55e3a5b5763f.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
 compress/rdo_quality_loss=0.0
 compress/hdr_compression=1
-compress/normal_map=0
+compress/normal_map=1
 compress/channel_pack=0
 mipmaps/generate=true
 mipmaps/limit=-1
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1

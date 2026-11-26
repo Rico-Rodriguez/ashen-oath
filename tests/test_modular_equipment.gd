@@ -45,8 +45,9 @@ func _run_suite() -> void:
 	_test_combat_stats_descriptors(gs)
 	await _test_all_classes_weapon_and_offhand_swaps()
 	await _test_modular_slots_and_independent_tiers()
-	await _test_sculpted_modular_helms_on_oathbreaker()
+	await _test_sculpted_modular_helms_all_classes()
 	await _test_sculpted_waist_lantern_all_classes()
+	await _test_wave5_sculpted_roster()
 
 	root.remove_child(gs)
 	gs.free()
@@ -297,85 +298,105 @@ func _test_modular_slots_and_independent_tiers() -> void:
 	await process_frame
 
 
-func _test_sculpted_modular_helms_on_oathbreaker() -> void:
-	var ps := load(GameRegistry.get_class_def("oathbreaker").actor_scene_path) as PackedScene
-	_check(ps != null, "Oathbreaker hero scene loads for sculpted helm checks")
-	var vis := ps.instantiate() as ActorVisual
-	root.add_child(vis)
-	vis.ensure_initialized()
-
-	var helm_mi := vis.model_instance.find_child("Slot_Helm", true, false) as MeshInstance3D
-	var plume_mi := vis.model_instance.find_child("Slot_Plume", true, false) as MeshInstance3D
-	var cuirass_mi := vis.model_instance.find_child("Slot_Cuirass", true, false) as MeshInstance3D
-	_check(helm_mi != null and plume_mi != null and cuirass_mi != null, "Oathbreaker kit exposes Slot_Helm, Slot_Plume, Slot_Cuirass")
-
-	HeroRigDresser.dress(
-		vis,
-		"oathbreaker",
-		1,
-		"zweihander",
-		"",
-		true,
-		GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD),
-		{"helm_tier": 3, "cuirass_tier": 1, "lantern_tier": 1, "helm_key": ""}
-	)
-	_check(helm_mi.visible and plume_mi.visible, "Starter T1 helm (helm_key empty) keeps Slot_Helm and Slot_Plume visible")
-	_check(vis.skeleton.get_node_or_null("ModularSlot_helm") == null, "Starter T1 helm does not mount ModularSlot_helm")
-	var base_helm_mat := helm_mi.get_surface_override_material(0) as ShaderMaterial
-	var base_cuirass_mat := cuirass_mi.get_surface_override_material(0) as ShaderMaterial
-	_check(base_helm_mat != null and int(base_helm_mat.get_shader_parameter("armor_tier")) == 3, "Base Slot_Helm keeps independent helm_tier=3")
-	_check(base_cuirass_mat != null and int(base_cuirass_mat.get_shader_parameter("armor_tier")) == 1, "Base Slot_Cuirass keeps independent cuirass_tier=1")
-
+func _test_sculpted_modular_helms_all_classes() -> void:
 	var helm_cases := [
 		{"key": "helm_t2", "tier": 2, "expect_emit": false},
 		{"key": "helm_t3", "tier": 3, "expect_emit": false},
 		{"key": "helm_t4", "tier": 4, "expect_emit": true},
 	]
-	for hc in helm_cases:
-		var hkey := str(hc["key"])
-		var htier := int(hc["tier"])
-		var expect_emit := bool(hc["expect_emit"])
+	var default_weapons := {
+		"oathbreaker": "zweihander",
+		"battlemage": "runed_staff",
+		"revenant": "halberd",
+	}
+
+	for cid in GameRegistry.CLASS_ORDER:
+		var ps := load(GameRegistry.get_class_def(cid).actor_scene_path) as PackedScene
+		_check(ps != null, "%s hero scene loads for sculpted helm checks" % cid)
+		var vis := ps.instantiate() as ActorVisual
+		root.add_child(vis)
+		vis.ensure_initialized()
+		_check(vis.is_unified_kit(), "%s uses unified 26-bone kit" % cid)
+
+		var helm_mi := vis.model_instance.find_child("Slot_Helm", true, false) as MeshInstance3D
+		var plume_mi := vis.model_instance.find_child("Slot_Plume", true, false) as MeshInstance3D
+		var cuirass_mi := vis.model_instance.find_child("Slot_Cuirass", true, false) as MeshInstance3D
+		var cloak_mi := vis.model_instance.find_child("Slot_Cloak", true, false) as MeshInstance3D
+		_check(helm_mi != null and cuirass_mi != null and cloak_mi != null, "%s kit exposes Slot_Helm, Slot_Cuirass, Slot_Cloak" % cid)
+		if cid == "oathbreaker":
+			_check(plume_mi != null, "oathbreaker kit exposes Slot_Plume")
+
+		var wkey := str(default_weapons.get(cid, "zweihander"))
+		var base_plume := (cid == "oathbreaker")
 		HeroRigDresser.dress(
 			vis,
-			"oathbreaker",
-			htier,
-			"zweihander",
+			cid,
+			1,
+			wkey,
 			"",
-			true,
+			base_plume,
 			GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD),
-			{"helm_tier": htier, "cuirass_tier": htier, "lantern_tier": htier, "helm_key": hkey}
+			{"helm_tier": 3, "cuirass_tier": 1, "lantern_tier": 1, "helm_key": ""}
 		)
-		_check(not helm_mi.visible, "%s hides base Slot_Helm" % hkey)
-		_check(not plume_mi.visible, "%s hides base Slot_Plume" % hkey)
-		_check(vis.skeleton.get_node_or_null("ForgedAttach_KitHelmPlume") == null, "%s does not mount legacy procedural plume" % hkey)
-		var mod_helm := vis.skeleton.get_node_or_null("ModularSlot_helm") as BoneAttachment3D
-		_check(mod_helm != null and mod_helm.bone_name == "head", "%s mounts ModularSlot_helm on head bone" % hkey)
-		var mod_meshes := mod_helm.find_children("*", "MeshInstance3D", true, false) if mod_helm != null else []
-		_check(mod_meshes.size() >= 1, "%s ModularSlot_helm has mounted MeshInstance3D" % hkey)
-		if mod_meshes.size() >= 1:
-			var rmi := mod_meshes[0] as MeshInstance3D
-			var smat := rmi.get_surface_override_material(0) as ShaderMaterial
-			_check(smat != null and smat.shader.resource_path == HeroRigDresser.ARMOR_SHADER_PATH, "%s uses armor_forge shader" % hkey)
-			if smat != null:
-				_check(not bool(smat.get_shader_parameter("is_armor_plate")), "%s preserves bespoke PBR paint (is_armor_plate == false)" % hkey)
-				_check(bool(smat.get_shader_parameter("has_emission_tex")) == expect_emit, "%s has_emission_tex == %s" % [hkey, str(expect_emit)])
+		_check(helm_mi.visible, "%s starter T1 helm (helm_key empty) keeps Slot_Helm visible" % cid)
+		if plume_mi != null:
+			_check(plume_mi.visible == base_plume, "%s starter T1 Slot_Plume matches has_plume" % cid)
+		_check(vis.skeleton.get_node_or_null("ModularSlot_helm") == null, "%s starter T1 helm does not mount ModularSlot_helm" % cid)
+		_check(vis.skeleton.get_node_or_null("ForgedAttach_KitHelmPlume") == null, "%s starter T1 does not spawn floating legacy plume" % cid)
+		var base_helm_mat := helm_mi.get_surface_override_material(0) as ShaderMaterial
+		var base_cuirass_mat := cuirass_mi.get_surface_override_material(0) as ShaderMaterial
+		_check(base_helm_mat != null and int(base_helm_mat.get_shader_parameter("armor_tier")) == 3, "%s base Slot_Helm keeps independent helm_tier=3" % cid)
+		_check(base_cuirass_mat != null and int(base_cuirass_mat.get_shader_parameter("armor_tier")) == 1, "%s base Slot_Cuirass keeps independent cuirass_tier=1" % cid)
 
-	HeroRigDresser.dress(
-		vis,
-		"oathbreaker",
-		1,
-		"zweihander",
-		"",
-		true,
-		GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD),
-		{"helm_tier": 1, "cuirass_tier": 1, "lantern_tier": 1, "helm_key": ""}
-	)
-	_check(vis.skeleton.get_node_or_null("ModularSlot_helm") == null, "Switching back to T1 frees ModularSlot_helm")
-	_check(helm_mi.visible and plume_mi.visible, "Switching back to T1 restores Slot_Helm and Slot_Plume")
+		for hc in helm_cases:
+			var hkey := str(hc["key"])
+			var htier := int(hc["tier"])
+			var expect_emit := bool(hc["expect_emit"])
+			HeroRigDresser.dress(
+				vis,
+				cid,
+				htier,
+				wkey,
+				"",
+				true,
+				GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD),
+				{"helm_tier": htier, "cuirass_tier": htier, "lantern_tier": htier, "helm_key": hkey}
+			)
+			_check(not helm_mi.visible, "%s %s hides base Slot_Helm" % [cid, hkey])
+			if plume_mi != null:
+				_check(not plume_mi.visible, "%s %s hides base Slot_Plume" % [cid, hkey])
+			_check(vis.skeleton.get_node_or_null("ForgedAttach_KitHelmPlume") == null, "%s %s does not mount legacy procedural plume" % [cid, hkey])
+			var mod_helm := vis.skeleton.get_node_or_null("ModularSlot_helm") as BoneAttachment3D
+			_check(mod_helm != null and mod_helm.bone_name == "head", "%s %s mounts ModularSlot_helm on head bone" % [cid, hkey])
+			var mod_meshes := mod_helm.find_children("*", "MeshInstance3D", true, false) if mod_helm != null else []
+			_check(mod_meshes.size() >= 1, "%s %s ModularSlot_helm has mounted MeshInstance3D" % [cid, hkey])
+			if mod_meshes.size() >= 1:
+				var rmi := mod_meshes[0] as MeshInstance3D
+				var smat := rmi.get_surface_override_material(0) as ShaderMaterial
+				_check(smat != null and smat.shader.resource_path == HeroRigDresser.ARMOR_SHADER_PATH, "%s %s uses armor_forge shader" % [cid, hkey])
+				if smat != null:
+					_check(not bool(smat.get_shader_parameter("is_armor_plate")), "%s %s preserves bespoke PBR paint (is_armor_plate == false)" % [cid, hkey])
+					_check(bool(smat.get_shader_parameter("has_emission_tex")) == expect_emit, "%s %s has_emission_tex == %s" % [cid, hkey, str(expect_emit)])
 
-	root.remove_child(vis)
-	vis.free()
-	await process_frame
+		HeroRigDresser.dress(
+			vis,
+			cid,
+			1,
+			wkey,
+			"",
+			base_plume,
+			GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD),
+			{"helm_tier": 1, "cuirass_tier": 1, "lantern_tier": 1, "helm_key": ""}
+		)
+		_check(vis.skeleton.get_node_or_null("ModularSlot_helm") == null, "%s switching back to T1 frees ModularSlot_helm" % cid)
+		_check(vis.skeleton.get_node_or_null("ForgedAttach_KitHelmPlume") == null, "%s switching back to T1 leaves no floating legacy plume" % cid)
+		_check(helm_mi.visible, "%s switching back to T1 restores Slot_Helm" % cid)
+		if plume_mi != null:
+			_check(plume_mi.visible == base_plume, "%s switching back to T1 restores Slot_Plume" % cid)
+
+		root.remove_child(vis)
+		vis.free()
+		await process_frame
 
 
 func _test_sculpted_waist_lantern_all_classes() -> void:
@@ -390,6 +411,7 @@ func _test_sculpted_waist_lantern_all_classes() -> void:
 		var vis := ps.instantiate() as ActorVisual
 		root.add_child(vis)
 		vis.ensure_initialized()
+		_check(vis.is_unified_kit(), "%s waist lantern check runs on unified 26-bone kit" % cid)
 
 		for asp in aspects:
 			var lcol := GameEnums.lantern_color(asp)
@@ -403,9 +425,8 @@ func _test_sculpted_waist_lantern_all_classes() -> void:
 				lcol,
 				{"helm_tier": 2, "cuirass_tier": 2, "lantern_tier": 3, "helm_key": ""}
 			)
-			var attach_name := "ForgedAttach_KitLantern" if vis.is_unified_kit() else "ForgedAttach_WaistLantern"
-			var ba := vis.skeleton.get_node_or_null(attach_name) as BoneAttachment3D
-			_check(ba != null, "%s mounts sculpted waist lantern (%s)" % [cid, attach_name])
+			var ba := vis.skeleton.get_node_or_null("ForgedAttach_KitLantern") as BoneAttachment3D
+			_check(ba != null, "%s mounts sculpted waist lantern (ForgedAttach_KitLantern)" % cid)
 			var light := ba.find_child("LanternLight", true, false) as OmniLight3D if ba != null else null
 			_check(light != null and light.light_color.is_equal_approx(lcol), "%s LanternLight matches aspect %d" % [cid, asp])
 			var found_tinted_pbr := false
@@ -430,3 +451,124 @@ func _test_sculpted_waist_lantern_all_classes() -> void:
 		root.remove_child(vis)
 		vis.free()
 		await process_frame
+
+
+func _test_wave5_sculpted_roster() -> void:
+	var roster_specs := [
+		{
+			"id": "battlemage",
+			"scene": "res://scenes/actors/heroes/battlemage.tscn",
+			"bones": 26,
+			"unified": true,
+			"expect_emission": false,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cast", "skill_arc", "dash", "hit", "death"],
+		},
+		{
+			"id": "revenant",
+			"scene": "res://scenes/actors/heroes/revenant.tscn",
+			"bones": 26,
+			"unified": true,
+			"expect_emission": false,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cleave", "skill_thrust", "skill_cast", "dash", "hit", "death"],
+		},
+		{
+			"id": "blight_werewolf",
+			"scene": "res://scenes/actors/enemies/blight_werewolf.tscn",
+			"bones": 26,
+			"unified": true,
+			"expect_emission": true,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cast", "skill_slam", "dash", "hit", "death"],
+		},
+		{
+			"id": "dread_golem",
+			"scene": "res://scenes/actors/enemies/dread_golem.tscn",
+			"bones": 26,
+			"unified": true,
+			"expect_emission": true,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cast", "skill_slam", "dash", "hit", "death"],
+		},
+		{
+			"id": "infernal_minotaur",
+			"scene": "res://scenes/actors/enemies/infernal_minotaur.tscn",
+			"bones": 26,
+			"unified": true,
+			"expect_emission": true,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cast", "skill_slam", "dash", "hit", "death"],
+		},
+		{
+			"id": "ash_scorpion",
+			"scene": "res://scenes/actors/enemies/ash_scorpion.tscn",
+			"bones": 21,
+			"unified": false,
+			"expect_emission": true,
+			"clips": ["idle", "run", "attack", "attack2", "skill_cast", "dash", "hit", "death"],
+		},
+	]
+
+	for sp in roster_specs:
+		var aid := str(sp["id"])
+		var scene_path := str(sp["scene"])
+		var expected_bones := int(sp["bones"])
+		var expect_unified := bool(sp["unified"])
+		var expect_emission := bool(sp["expect_emission"])
+		var clips: Array = sp["clips"]
+
+		var ps := load(scene_path) as PackedScene
+		_check(ps != null, "Wave 5 scene loads cleanly: %s" % scene_path)
+		if ps == null:
+			continue
+
+		var vis := ps.instantiate() as ActorVisual
+		root.add_child(vis)
+		vis.ensure_initialized()
+
+		_check(vis.skeleton != null, "%s has valid Skeleton3D" % aid)
+		if vis.skeleton != null:
+			_check(
+				vis.skeleton.get_bone_count() == expected_bones,
+				"%s skeleton bone count == %d (got %d)" % [aid, expected_bones, vis.skeleton.get_bone_count()]
+			)
+		_check(vis.is_unified_kit() == expect_unified, "%s is_unified_kit() == %s" % [aid, str(expect_unified)])
+		_check(vis.anim_player != null, "%s has valid AnimationPlayer" % aid)
+
+		if vis.anim_player != null:
+			for logical_clip in clips:
+				var lclip := str(logical_clip)
+				var resolved := vis._resolve_clip_name(lclip)
+				_check(
+					resolved != "" and vis.anim_player.has_animation(resolved),
+					"%s resolves logical clip '%s' -> '%s'" % [aid, lclip, resolved]
+				)
+				if lclip != "idle":
+					_check(
+						resolved != "idle",
+						"%s logical clip '%s' maps to dedicated combat animation (not idle fallback)" % [aid, lclip]
+					)
+				vis.play_anim(lclip, 1.0, true)
+
+		if expect_emission:
+			var found_baked_emit := false
+			for n in vis.model_instance.find_children("*", "MeshInstance3D", true, false):
+				var mi := n as MeshInstance3D
+				if mi.mesh == null:
+					continue
+				for s in mi.mesh.get_surface_count():
+					var ov := mi.get_surface_override_material(s)
+					if ov is StandardMaterial3D:
+						var sm := ov as StandardMaterial3D
+						if (
+							sm.emission_texture != null
+							and sm.emission_enabled
+							and sm.emission_operator == BaseMaterial3D.EMISSION_OP_MULTIPLY
+							and sm.emission_energy_multiplier >= 1.8
+						):
+							found_baked_emit = true
+			_check(found_baked_emit, "%s preserves baked emission texture with EMISSION_OP_MULTIPLY and energy >= 1.8" % aid)
+
+		root.remove_child(vis)
+		vis.free()
+		await process_frame
+		await process_frame
+
+		var orphans := roundi(Performance.get_monitor(Performance.OBJECT_ORPHAN_NODE_COUNT))
+		_check(orphans == 0, "%s teardown leaves 0 orphan nodes (got %d)" % [aid, orphans])

@@ -40,6 +40,7 @@ var signature_exec_counts: Dictionary = {}
 var _state_timer: float = 0.0
 var _execute_duration: float = 0.24
 var _locked_dir: Vector3 = Vector3.FORWARD
+var _attack_origin: Vector3 = Vector3.ZERO
 var _executed_hit: bool = false
 var _windup_cast_anim: bool = false
 var _strafe_sign: float = 1.0
@@ -193,6 +194,7 @@ func _physics_process(delta: float) -> void:
 	if _knockback_vel.length_squared() > 0.0004:
 		velocity += _knockback_vel
 	move_and_slide()
+	_apply_enemy_soft_separation(delta)
 	_enforce_hero_separation(hero)
 	_constrain_to_ground_and_bounds()
 	_update_locomotion_visual()
@@ -215,7 +217,7 @@ func _process_chase(hero: Node3D, delta: float) -> void:
 		GameEnums.EnemyArchetype.SWARMER:
 			if dist <= 1.9:
 				_begin_windup(dir_to_hero, 0.38 * _windup_scale)
-				_register_telegraph_line(dir_to_hero, 2.2, 0.9, _state_timer)
+				_register_telegraph_line(dir_to_hero, 2.6, 1.4, _state_timer)
 				_play_sfx("enemy_windup")
 				return
 			velocity = (dir_to_hero + _separation_push() * 0.45).normalized() * move_speed
@@ -237,7 +239,7 @@ func _process_chase(hero: Node3D, delta: float) -> void:
 		GameEnums.EnemyArchetype.CHARGER:
 			if dist <= 9.5:
 				_begin_windup(dir_to_hero, 0.68 * _windup_scale)
-				_register_telegraph_line(dir_to_hero, 10.5, 1.6, _state_timer)
+				_register_telegraph_line(dir_to_hero, 10.5, 2.0, _state_timer)
 				_play_sfx("enemy_windup")
 				return
 			velocity = (dir_to_hero + _separation_push() * 0.35).normalized() * move_speed
@@ -310,7 +312,7 @@ func _process_troll_chase(hero: Node3D, dir_to_hero: Vector3, dist: float) -> vo
 				_boss_move_index = (_boss_move_index + 1) % 3
 				var w_dur := 0.75 * _windup_scale
 				_begin_windup(dir_to_hero, w_dur)
-				_register_telegraph_line(dir_to_hero, 13.0, 2.6, w_dur)
+				_register_telegraph_line(dir_to_hero, 13.0, 2.8, w_dur)
 				_play_sfx("boss_windup")
 				return
 	velocity = dir_to_hero * move_speed
@@ -325,7 +327,7 @@ func _process_werewolf_chase(hero: Node3D, dir_to_hero: Vector3, dist: float) ->
 				_boss_chain_remaining = 1
 				var w_dur := 0.52 * _windup_scale
 				_begin_windup(dir_to_hero, w_dur)
-				_register_telegraph_line(dir_to_hero, 9.5, 1.9, w_dur, tox_col)
+				_register_telegraph_line(dir_to_hero, 9.5, 2.6, w_dur, tox_col)
 				_play_sfx("boss_windup")
 				return
 		1:
@@ -389,7 +391,7 @@ func _process_minotaur_chase(hero: Node3D, dir_to_hero: Vector3, dist: float) ->
 				_boss_move_index = (_boss_move_index + 1) % 3
 				var w_dur := 0.70 * _windup_scale
 				_begin_windup(dir_to_hero, w_dur)
-				_register_telegraph_line(dir_to_hero, 14.0, 2.8, w_dur, hell_col)
+				_register_telegraph_line(dir_to_hero, 14.0, 3.0, w_dur, hell_col)
 				_play_sfx("boss_windup")
 				return
 		1:
@@ -472,6 +474,7 @@ func _schedule_staggered_circles(
 func _begin_windup(dir: Vector3, duration: float, play_cast_anim: bool = false) -> void:
 	state = State.WINDUP
 	_locked_dir = dir.normalized() if dir.length_squared() > 0.0001 else _forward_dir()
+	_attack_origin = Vector3(global_position.x, 0.0, global_position.z)
 	_face_direction_instant(_locked_dir)
 	_state_timer = maxf(0.05, duration)
 	_executed_hit = false
@@ -619,7 +622,7 @@ func _process_execute(hero: Node3D, delta: float) -> void:
 		GameEnums.EnemyArchetype.SWARMER:
 			velocity = _locked_dir * (1.4 / 0.16)
 			if not _executed_hit:
-				if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 1.55 + h_rad, 115.0, 0.95 + h_rad):
+				if _is_in_line_box_xz(_attack_origin, _locked_dir, hero.global_position, 2.6, 1.4, h_rad * 0.35):
 					_executed_hit = true
 					_deal_damage_to_hero(hero, attack_damage, enemy_def.enemy_id)
 
@@ -629,7 +632,7 @@ func _process_execute(hero: Node3D, delta: float) -> void:
 		GameEnums.EnemyArchetype.CHARGER:
 			velocity = _locked_dir * 14.5
 			if not _executed_hit:
-				if _dist_xz(global_position, hero.global_position) <= 0.85 + h_rad:
+				if _dist_xz(global_position, hero.global_position) <= 0.72 + h_rad * 0.55:
 					_executed_hit = true
 					_deal_damage_to_hero(hero, attack_damage, enemy_def.enemy_id)
 
@@ -639,7 +642,7 @@ func _process_execute(hero: Node3D, delta: float) -> void:
 				_executed_hit = true
 				if vfx != null and vfx.has_method("spawn_slash_arc"):
 					vfx.call("spawn_slash_arc", global_position + Vector3(0.0, 1.0, 0.0), _locked_dir, 3.6, 95.0, Color(0.95, 0.35, 0.18, 0.95))
-				if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 3.6 + h_rad, 95.0, 0.95 + h_rad):
+				if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 3.6 + h_rad * 0.25, 95.0, 0.45):
 					_deal_damage_to_hero(hero, attack_damage, enemy_def.enemy_id)
 
 		GameEnums.EnemyArchetype.BOSS:
@@ -661,7 +664,7 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 			match _active_boss_move:
 				0:
 					velocity = _locked_dir * 21.0
-					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.22 + h_rad:
+					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.05 + h_rad * 0.5:
 						_executed_hit = true
 						_deal_damage_to_hero(hero, attack_damage * 0.95, "blight_werewolf_pounce", DamageEvent.Kind.BLEED)
 				1:
@@ -671,7 +674,7 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 						var rend_col := Color(0.46, 0.96, 0.28, 0.95)
 						if vfx != null and vfx.has_method("spawn_slash_arc"):
 							vfx.call("spawn_slash_arc", global_position, _locked_dir, 4.8, 130.0, rend_col)
-						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 4.8 + h_rad, 130.0, 1.30 + h_rad):
+						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 4.8 + h_rad * 0.25, 130.0, 0.55):
 							_deal_damage_to_hero(hero, attack_damage * 1.05, "blight_werewolf_rend", DamageEvent.Kind.SHADOW)
 						_fire_boss_fan_from_dir(_locked_dir, [-36.0, -18.0, 0.0, 18.0, 36.0], 13.5, attack_damage * 0.72, "blood_orb", DamageEvent.Kind.SHADOW)
 				2:
@@ -694,7 +697,7 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 						var arc_col := Color(0.36, 0.62, 1.0, 1.0)
 						if vfx != null and vfx.has_method("spawn_shockwave_ring"):
 							vfx.call("spawn_shockwave_ring", global_position, 3.6, arc_col)
-						if _dist_xz(global_position, hero.global_position) <= 3.6 + h_rad:
+						if _dist_xz(global_position, hero.global_position) <= 3.6 + h_rad * 0.25:
 							_deal_damage_to_hero(hero, attack_damage * 1.15, "dread_golem_inner_ring", DamageEvent.Kind.LIGHTNING)
 						_schedule_concentric_outer_ring(global_position, 4.5, 8.0, 0.45, attack_damage * 1.15)
 				1:
@@ -726,14 +729,14 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 								vfx.call("spawn_shockwave_ring", global_position + _locked_dir * 2.4, 3.8, Color(0.38, 0.62, 1.0, 1.0))
 							if vfx.has_method("spawn_slash_arc"):
 								vfx.call("spawn_slash_arc", global_position, _locked_dir, 5.4, 105.0, Color(0.42, 0.66, 1.0, 0.95))
-						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.4 + h_rad, 105.0, 1.35 + h_rad):
+						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.4 + h_rad * 0.25, 105.0, 0.55):
 							_deal_damage_to_hero(hero, attack_damage * 1.25, "dread_golem_monolith_slam", DamageEvent.Kind.PHYSICAL)
 
 		"infernal_minotaur":
 			match _active_boss_move:
 				0:
 					velocity = _locked_dir * 18.5
-					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.38 + h_rad:
+					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.25 + h_rad * 0.5:
 						_executed_hit = true
 						_deal_damage_to_hero(hero, attack_damage * 1.22, "infernal_minotaur_stampede", DamageEvent.Kind.FIRE)
 					var dur := maxf(_execute_duration, 0.05)
@@ -754,7 +757,7 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 								vfx.call("spawn_slash_arc", global_position, _locked_dir, 5.6, 150.0, Color(1.0, 0.36, 0.10, 0.98))
 							if vfx.has_method("spawn_shockwave_ring"):
 								vfx.call("spawn_shockwave_ring", global_position + _locked_dir * 2.4, 4.2, Color(1.0, 0.30, 0.08, 1.0))
-						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.6 + h_rad, 150.0, 1.45 + h_rad):
+						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.6 + h_rad * 0.25, 150.0, 0.55):
 							_deal_damage_to_hero(hero, attack_damage * 1.28, "infernal_minotaur_cleave", DamageEvent.Kind.FIRE)
 						if is_enraged:
 							_fire_boss_fan_from_dir(_locked_dir, [-50.0, -25.0, 0.0, 25.0, 50.0], 13.5, attack_damage * 0.78, "boss_ember", DamageEvent.Kind.FIRE)
@@ -774,13 +777,13 @@ func _process_boss_execute(hero: Node3D, h_rad: float, _delta: float) -> void:
 								vfx.call("spawn_shockwave_ring", global_position + _locked_dir * 2.0, 3.8, Color(0.95, 0.34, 0.12, 1.0))
 							if vfx.has_method("spawn_slash_arc"):
 								vfx.call("spawn_slash_arc", global_position, _locked_dir, 5.2, 115.0, Color(0.96, 0.42, 0.16, 0.95))
-						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.2 + h_rad, 115.0, 1.35 + h_rad):
+						if _is_in_cone_xz(global_position, _locked_dir, hero.global_position, 5.2 + h_rad * 0.25, 115.0, 0.55):
 							_deal_damage_to_hero(hero, attack_damage * 1.15, enemy_def.enemy_id + "_slam")
 				1:
 					velocity = Vector3.ZERO
 				2:
 					velocity = _locked_dir * 16.0
-					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.30 + h_rad:
+					if not _executed_hit and _dist_xz(global_position, hero.global_position) <= 1.15 + h_rad * 0.5:
 						_executed_hit = true
 						_deal_damage_to_hero(hero, attack_damage * 1.20, enemy_def.enemy_id + "_charge")
 
@@ -794,7 +797,7 @@ func _finish_boss_execute(hero: Node3D, h_rad: float) -> bool:
 			var next_dir := to_h.normalized() if to_h.length_squared() > 0.0001 else _locked_dir
 			var w_dur := 0.52 * _windup_scale
 			_begin_windup(next_dir, w_dur)
-			_register_telegraph_line(next_dir, 9.5, 1.9, w_dur, Color(0.45, 0.94, 0.24, 0.82))
+			_register_telegraph_line(next_dir, 9.5, 2.6, w_dur, Color(0.45, 0.94, 0.24, 0.82))
 			_play_sfx("boss_windup")
 			return true
 		if _active_boss_move == 2:
@@ -805,7 +808,7 @@ func _finish_boss_execute(hero: Node3D, h_rad: float) -> bool:
 			_add_trauma(0.42)
 			if vfx != null and vfx.has_method("spawn_shockwave_ring"):
 				vfx.call("spawn_shockwave_ring", _boss_leap_target, 3.4, Color(0.45, 0.96, 0.28, 1.0))
-			if _dist_xz(_boss_leap_target, hero.global_position) <= 3.4 + h_rad:
+			if _dist_xz(_boss_leap_target, hero.global_position) <= 3.4 + h_rad * 0.25:
 				_deal_damage_to_hero(hero, attack_damage * 1.18, "blight_werewolf_leap_slam", DamageEvent.Kind.SHADOW)
 
 	elif bid == "infernal_minotaur":
@@ -824,14 +827,8 @@ func _finish_boss_execute(hero: Node3D, h_rad: float) -> bool:
 
 
 func _schedule_concentric_outer_ring(center: Vector3, inner_r: float, outer_r: float, delay: float, dmg: float) -> void:
-	var ring_col := Color(0.36, 0.58, 1.0, 0.72)
-	_register_telegraph_circle(center, outer_r, delay, Color(0.30, 0.50, 0.98, 0.42))
-	var mid_r := (inner_r + outer_r) * 0.5
-	var sub_r := (outer_r - inner_r) * 0.5
-	for i in range(8):
-		var ang := (TAU * float(i)) / 8.0
-		var sub_p := center + Vector3(cos(ang) * mid_r, 0.0, sin(ang) * mid_r)
-		_register_telegraph_circle(sub_p, sub_r, delay, ring_col)
+	var ring_col := Color(0.36, 0.62, 1.0, 0.88)
+	_register_telegraph_ring(center, inner_r, outer_r, delay, ring_col)
 
 	_pending_eruptions.append({
 		"shape": "ring",
@@ -935,7 +932,7 @@ func _tick_pending_eruptions(delta: float) -> void:
 				if hero != null and is_instance_valid(hero):
 					var hd := _dist_xz(rp, hero.global_position)
 					var h_rad := _hero_radius(hero)
-					if hd >= in_r - h_rad and hd <= out_r + h_rad:
+					if hd >= in_r - h_rad * 0.25 and hd <= out_r + h_rad * 0.25:
 						_deal_damage_to_hero(
 							hero,
 							rdmg,
@@ -954,7 +951,7 @@ func _tick_pending_eruptions(delta: float) -> void:
 						vfx.call("spawn_shockwave_ring", p, rad, col)
 				_play_sfx("boom")
 				if hero != null and is_instance_valid(hero):
-					if _dist_xz(p, hero.global_position) <= rad + _hero_radius(hero):
+					if _dist_xz(p, hero.global_position) <= rad + _hero_radius(hero) * 0.25:
 						_deal_damage_to_hero(
 							hero,
 							dmg,
@@ -1229,6 +1226,128 @@ func _register_telegraph_cone(
 		_active_telegraphs.append(node)
 
 
+func _register_telegraph_ring(
+	center: Vector3,
+	inner_r: float,
+	outer_r: float,
+	duration: float,
+	color: Color = Color(0.36, 0.62, 1.0, 0.85)
+) -> void:
+	var host: Node3D = vfx
+	if host == null and director != null and director.get("vfx_root") is Node3D:
+		host = director.get("vfx_root") as Node3D
+	if host == null or not is_instance_valid(host):
+		return
+
+	var fx := VfxOneshot3D.new()
+	fx.name = "TelegraphHollowRing"
+	fx.position = Vector3(center.x, 0.035, center.z)
+	host.add_child(fx)
+	_active_telegraphs.append(fx)
+
+	var dur := maxf(duration, 0.05)
+	if DisplayServer.get_name() == "headless":
+		fx.configure(dur + 0.05)
+		return
+
+	var r_in := maxf(inner_r, 0.2)
+	var r_out := maxf(outer_r, r_in + 0.25)
+
+	var fill_mat := StandardMaterial3D.new()
+	fill_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	fill_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	fill_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	fill_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	fill_mat.albedo_color = Color(color.r, color.g, color.b, 0.22 * color.a)
+
+	var annulus := _build_annulus_mesh(r_in, r_out, 56)
+	var fill_mi := MeshInstance3D.new()
+	fill_mi.name = "HollowBandFill"
+	fill_mi.mesh = annulus
+	fill_mi.material_override = fill_mat
+	fill_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fx.add_child(fill_mi)
+
+	var rim_mat := StandardMaterial3D.new()
+	rim_mat.shading_mode = BaseMaterial3D.SHADING_MODE_UNSHADED
+	rim_mat.transparency = BaseMaterial3D.TRANSPARENCY_ALPHA
+	rim_mat.blend_mode = BaseMaterial3D.BLEND_MODE_ADD
+	rim_mat.cull_mode = BaseMaterial3D.CULL_DISABLED
+	rim_mat.depth_draw_mode = BaseMaterial3D.DEPTH_DRAW_DISABLED
+	rim_mat.albedo_color = Color(color.r * 2.2, color.g * 2.2, color.b * 2.4, 0.92)
+
+	for rim_r: float in [r_in, r_out]:
+		var tm := TorusMesh.new()
+		tm.inner_radius = maxf(0.05, rim_r - 0.09)
+		tm.outer_radius = rim_r + 0.09
+		tm.rings = 48
+		tm.ring_segments = 6
+		var rmi := MeshInstance3D.new()
+		rmi.mesh = tm
+		rmi.scale = Vector3(1.0, 0.05, 1.0)
+		rmi.position.y = 0.006
+		rmi.material_override = rim_mat
+		rmi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+		fx.add_child(rmi)
+
+	var sweep_torus := TorusMesh.new()
+	sweep_torus.inner_radius = 0.96
+	sweep_torus.outer_radius = 1.0
+	sweep_torus.rings = 48
+	sweep_torus.ring_segments = 6
+	var sweep_mi := MeshInstance3D.new()
+	sweep_mi.name = "SweepRing"
+	sweep_mi.mesh = sweep_torus
+	sweep_mi.scale = Vector3(r_in, 0.06, r_in)
+	sweep_mi.position.y = 0.01
+	sweep_mi.material_override = rim_mat
+	sweep_mi.cast_shadow = GeometryInstance3D.SHADOW_CASTING_SETTING_OFF
+	fx.add_child(sweep_mi)
+
+	fx.configure(dur + 0.05, func(t01: float, el: float) -> void:
+		var p := clampf(el / dur, 0.0, 1.0)
+		var pulse := 0.85 + 0.15 * sin(el * (10.0 + p * 12.0))
+		fill_mat.albedo_color = Color(color.r * (0.9 + p * 0.45), color.g * (0.9 + p * 0.45), color.b * (1.0 + p * 0.35), (0.20 + 0.34 * p) * color.a)
+		rim_mat.albedo_color.a = clampf((0.75 + 0.25 * p) * pulse, 0.0, 1.0)
+		if is_instance_valid(sweep_mi):
+			var cur_r := lerpf(r_in, r_out, p)
+			sweep_mi.scale = Vector3(cur_r, 0.06, cur_r)
+		if t01 >= 0.98:
+			fill_mat.albedo_color.a *= 0.25
+	)
+
+
+static func _build_annulus_mesh(inner_r: float, outer_r: float, segments: int = 56) -> ArrayMesh:
+	var verts := PackedVector3Array()
+	var normals := PackedVector3Array()
+	var indices := PackedInt32Array()
+	var segs := maxi(16, segments)
+	for i in range(segs + 1):
+		var ang := (TAU * float(i)) / float(segs)
+		var ca := cos(ang)
+		var sa := sin(ang)
+		verts.append(Vector3(ca * inner_r, 0.0, sa * inner_r))
+		verts.append(Vector3(ca * outer_r, 0.0, sa * outer_r))
+		normals.append(Vector3.UP)
+		normals.append(Vector3.UP)
+	for i in range(segs):
+		var b := i * 2
+		indices.append(b)
+		indices.append(b + 1)
+		indices.append(b + 2)
+		indices.append(b + 2)
+		indices.append(b + 1)
+		indices.append(b + 3)
+	var arrays := []
+	arrays.resize(Mesh.ARRAY_MAX)
+	arrays[Mesh.ARRAY_VERTEX] = verts
+	arrays[Mesh.ARRAY_NORMAL] = normals
+	arrays[Mesh.ARRAY_INDEX] = indices
+	var am := ArrayMesh.new()
+	am.add_surface_from_arrays(Mesh.PRIMITIVE_TRIANGLES, arrays)
+	return am
+
+
 func _cancel_telegraphs_and_pending() -> void:
 	_pending_eruptions.clear()
 	for t in _active_telegraphs:
@@ -1247,7 +1366,7 @@ func _mount_visual() -> void:
 	visual = ps.instantiate() as ActorVisual
 	add_child(visual)
 	var scale_factor := 1.0
-	if enemy_def.is_boss and visual.height_meters < 3.0:
+	if enemy_def.is_boss and visual.height_meters < 2.6:
 		scale_factor = 1.55
 	elif is_elite:
 		scale_factor = 1.24
@@ -1281,6 +1400,35 @@ func _separation_push() -> Vector3:
 		if d > 0.001 and d < desired:
 			push += (diff / d) * ((desired - d) / desired)
 	return push
+
+
+func _apply_enemy_soft_separation(delta: float) -> void:
+	if state == State.DEAD or move_speed <= 0.001 or (enemy_def.is_boss and state == State.EXECUTE):
+		return
+	if director == null or not director.has_method("get_alive_enemies"):
+		return
+	var push := Vector3.ZERO
+	for raw in director.call("get_alive_enemies"):
+		var other := raw as Node3D
+		if other == null or other == self or not is_instance_valid(other):
+			continue
+		var o_rad := float(other.get("body_radius")) if other.get("body_radius") != null else 0.60
+		var min_sep := body_radius + o_rad + 0.18
+		var diff := Vector3(global_position.x - other.global_position.x, 0.0, global_position.z - other.global_position.z)
+		var d_sq := diff.length_squared()
+		if d_sq >= min_sep * min_sep:
+			continue
+		if d_sq > 0.0001:
+			var d := sqrt(d_sq)
+			push += (diff / d) * (min_sep - d)
+		else:
+			var ang := float(get_instance_id() % 360) * 0.0174533
+			push += Vector3(cos(ang), 0.0, sin(ang)) * (min_sep * 0.35)
+	if push.length_squared() > 0.00001:
+		var strength := 0.35 if state in [State.WINDUP, State.EXECUTE] else 0.55
+		var disp := (push * strength).limit_length(move_speed * 0.75 * delta)
+		global_position.x += disp.x
+		global_position.z += disp.z
 
 
 func _constrain_to_ground_and_bounds() -> void:
@@ -1402,3 +1550,23 @@ static func _is_in_cone_xz(
 	var fwd := Vector2(forward.x, forward.z).normalized()
 	var dir := dv / maxf(dist, 0.0001)
 	return fwd.dot(dir) >= cos(deg_to_rad(arc_deg * 0.5))
+
+
+static func _is_in_line_box_xz(
+	origin: Vector3,
+	forward: Vector3,
+	target_pos: Vector3,
+	length_m: float,
+	width_m: float,
+	pad_m: float = 0.15
+) -> bool:
+	var fwd := Vector2(forward.x, forward.z)
+	if fwd.length_squared() < 0.0001:
+		fwd = Vector2(0.0, -1.0)
+	else:
+		fwd = fwd.normalized()
+	var right := Vector2(-fwd.y, fwd.x)
+	var rel := Vector2(target_pos.x - origin.x, target_pos.z - origin.z)
+	var along := rel.dot(fwd)
+	var across := absf(rel.dot(right))
+	return along >= -pad_m and along <= length_m + pad_m and across <= width_m * 0.5 + pad_m

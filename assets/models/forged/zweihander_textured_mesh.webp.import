@@ -3,9 +3,11 @@
 importer="texture"
 type="CompressedTexture2D"
 uid="uid://cvonhsgq6ex5p"
-path="res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.ctex"
+path.s3tc="res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.s3tc.ctex"
+path.etc2="res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.etc2.ctex"
 metadata={
-"vram_texture": false
+"imported_formats": ["s3tc_bptc", "etc2_astc"],
+"vram_texture": true
 }
 generator_parameters={
 "md5": "d4f8e03dcec44003e1ecaea53194e78f"
@@ -14,11 +16,11 @@ generator_parameters={
 [deps]
 
 source_file="res://assets/models/forged/zweihander_textured_mesh.webp"
-dest_files=["res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.ctex"]
+dest_files=["res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.s3tc.ctex", "res://.godot/imported/zweihander_textured_mesh.webp-6c7ff12e98561429bd195c58937e84c6.etc2.ctex"]
 
 [params]
 
-compress/mode=0
+compress/mode=2
 compress/high_quality=false
 compress/lossy_quality=0.7
 compress/uastc_level=0
@@ -39,5 +41,5 @@ process/premult_alpha=false
 process/normal_map_invert_y=false
 process/hdr_as_srgb=false
 process/hdr_clamp_exposure=false
-process/size_limit=0
+process/size_limit=512
 detect_3d/compress_to=1
