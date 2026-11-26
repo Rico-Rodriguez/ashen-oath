@@ -149,11 +149,11 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 		"weald":
 			return {
 				"id": "weald",
-				"fog_color": Color(0.06, 0.15, 0.09, 1.0),
-				"fog_density": 0.0165,
+				"fog_color": Color(0.055, 0.135, 0.085, 1.0),
+				"fog_density": 0.0155,
 				"fog_energy": 0.96,
 				"ambient_color": Color(0.19, 0.34, 0.23, 1.0),
-				"ambient_energy": 0.94,
+				"ambient_energy": 0.88,
 				"moon_color": Color(0.60, 0.90, 0.68, 1.0),
 				"moon_energy": 1.38,
 				"moon_rot": Vector3(-50.0, -24.0, 0.0),
@@ -164,8 +164,10 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 				"tex_dirt_n": "res://assets/textures/ground_dirt_normal.jpg",
 				"tex_stone_c": "res://assets/textures/lush_color.jpg",
 				"tex_stone_n": "res://assets/textures/lush_normal.jpg",
-				"stone_albedo": Color(0.24, 0.32, 0.24, 1.0),
+				"stone_albedo": Color(0.32, 0.42, 0.33, 1.0),
 				"iron_albedo": Color(0.10, 0.14, 0.11, 1.0),
+				"sky_clerestory": Color(0.48, 0.92, 0.64, 1.0),
+				"sky_brazier": Color(0.76, 0.88, 0.28, 1.0),
 				"shrine_rune": Color(0.38, 0.95, 0.54, 1.0),
 				"gate_ward": Color(0.46, 0.96, 0.34, 1.0),
 				"brazier_primary": {
@@ -186,11 +188,11 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 		"catacombs":
 			return {
 				"id": "catacombs",
-				"fog_color": Color(0.06, 0.07, 0.18, 1.0),
-				"fog_density": 0.0150,
+				"fog_color": Color(0.055, 0.072, 0.165, 1.0),
+				"fog_density": 0.0145,
 				"fog_energy": 0.94,
 				"ambient_color": Color(0.22, 0.25, 0.44, 1.0),
-				"ambient_energy": 0.96,
+				"ambient_energy": 0.90,
 				"moon_color": Color(0.62, 0.72, 1.0, 1.0),
 				"moon_energy": 1.48,
 				"moon_rot": Vector3(-55.0, 32.0, 0.0),
@@ -201,8 +203,10 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 				"tex_dirt_n": "res://assets/textures/rock_normal.jpg",
 				"tex_stone_c": "res://assets/textures/path_color.jpg",
 				"tex_stone_n": "res://assets/textures/path_normal.jpg",
-				"stone_albedo": Color(0.26, 0.29, 0.44, 1.0),
+				"stone_albedo": Color(0.35, 0.38, 0.54, 1.0),
 				"iron_albedo": Color(0.11, 0.12, 0.19, 1.0),
+				"sky_clerestory": Color(0.44, 0.66, 1.0, 1.0),
+				"sky_brazier": Color(0.34, 0.62, 1.0, 1.0),
 				"shrine_rune": Color(0.46, 0.62, 1.0, 1.0),
 				"gate_ward": Color(0.36, 0.56, 1.0, 1.0),
 				"brazier_primary": {
@@ -223,11 +227,11 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 		"rift":
 			return {
 				"id": "rift",
-				"fog_color": Color(0.18, 0.05, 0.04, 1.0),
-				"fog_density": 0.0155,
+				"fog_color": Color(0.16, 0.052, 0.045, 1.0),
+				"fog_density": 0.0150,
 				"fog_energy": 0.96,
 				"ambient_color": Color(0.42, 0.19, 0.15, 1.0),
-				"ambient_energy": 0.95,
+				"ambient_energy": 0.88,
 				"moon_color": Color(1.0, 0.60, 0.42, 1.0),
 				"moon_energy": 1.58,
 				"moon_rot": Vector3(-48.0, -28.0, 0.0),
@@ -238,8 +242,10 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 				"tex_dirt_n": "res://assets/textures/ground_dirt_normal.jpg",
 				"tex_stone_c": "res://assets/textures/rock_color.jpg",
 				"tex_stone_n": "res://assets/textures/rock_normal.jpg",
-				"stone_albedo": Color(0.21, 0.14, 0.14, 1.0),
+				"stone_albedo": Color(0.32, 0.22, 0.21, 1.0),
 				"iron_albedo": Color(0.14, 0.09, 0.09, 1.0),
+				"sky_clerestory": Color(0.95, 0.50, 0.32, 1.0),
+				"sky_brazier": Color(1.0, 0.36, 0.10, 1.0),
 				"shrine_rune": Color(1.0, 0.42, 0.14, 1.0),
 				"gate_ward": Color(1.0, 0.24, 0.08, 1.0),
 				"brazier_primary": {
@@ -260,23 +266,25 @@ static func _biome_profile(zd: ZoneDef) -> Dictionary:
 		_:
 			return {
 				"id": "fringe",
-				"fog_color": Color(0.09, 0.12, 0.17, 1.0),
-				"fog_density": 0.0135,
+				"fog_color": Color(0.07, 0.08, 0.12, 1.0),
+				"fog_density": 0.014,
 				"fog_energy": 0.88,
 				"ambient_color": Color(0.26, 0.31, 0.40, 1.0),
-				"ambient_energy": 0.94,
+				"ambient_energy": 0.84,
 				"moon_color": Color(0.74, 0.84, 0.98, 1.0),
 				"moon_energy": 1.60,
 				"moon_rot": Vector3(-52.0, 28.0, 0.0),
-				"ground_tint": Color(0.28, 0.29, 0.31, 1.0),
+				"ground_tint": Color(0.24, 0.25, 0.28, 1.0),
 				"tex_forest_c": "res://assets/textures/ground_forest_color.jpg",
 				"tex_forest_n": "res://assets/textures/ground_forest_normal.jpg",
 				"tex_dirt_c": "res://assets/textures/ground_dirt_color.jpg",
 				"tex_dirt_n": "res://assets/textures/ground_dirt_normal.jpg",
 				"tex_stone_c": "res://assets/textures/rock_color.jpg",
 				"tex_stone_n": "res://assets/textures/rock_normal.jpg",
-				"stone_albedo": Color(0.31, 0.34, 0.39, 1.0),
+				"stone_albedo": Color(0.42, 0.45, 0.50, 1.0),
 				"iron_albedo": Color(0.11, 0.12, 0.14, 1.0),
+				"sky_clerestory": Color(0.45, 0.62, 1.0, 1.0),
+				"sky_brazier": Color(1.0, 0.50, 0.16, 1.0),
 				"shrine_rune": Color(0.32, 0.72, 1.0, 1.0),
 				"gate_ward": Color(0.96, 0.18, 0.14, 1.0),
 				"brazier_primary": {
@@ -301,7 +309,9 @@ static func _make_build_cache(profile: Dictionary, headless: bool) -> Dictionary
 	if headless:
 		return cache
 
-	cache["stone_mat"] = _make_stone_material(profile["stone_albedo"] as Color)
+	var base_stone := profile["stone_albedo"] as Color
+	cache["stone_mat"] = _make_stone_material(base_stone, 0.82, 0.85)
+	cache["dark_stone_mat"] = _make_stone_material(base_stone.darkened(0.42), 0.78, 0.90)
 	cache["iron_mat"] = _make_iron_material(profile["iron_albedo"] as Color)
 
 	cache["kit_pillar"] = load("res://assets/models/kit/kit_gothic_pillar.glb") as PackedScene
@@ -378,32 +388,44 @@ static func _configure_or_create_lighting(parent: Node3D, profile: Dictionary) -
 	we.environment = env
 
 	var fog_col: Color = profile["fog_color"]
-	var amb_col: Color = profile["ambient_color"]
 
-	var sky_mat := ProceduralSkyMaterial.new()
-	sky_mat.sky_top_color = fog_col.darkened(0.52)
-	sky_mat.sky_horizon_color = fog_col.lightened(0.10)
-	sky_mat.ground_horizon_color = fog_col.darkened(0.30)
-	sky_mat.ground_bottom_color = Color(0.02, 0.02, 0.03)
 	var sky := Sky.new()
-	sky.sky_material = sky_mat
+	if ResourceLoader.exists("res://assets/textures/cathedral_ibl_panorama.png"):
+		var pmat := PanoramaSkyMaterial.new()
+		pmat.panorama = load("res://assets/textures/cathedral_ibl_panorama.png") as Texture2D
+		sky.sky_material = pmat
+	else:
+		var sky_sh := load("res://shaders/sky_cathedral_ibl.gdshader") as Shader
+		if sky_sh != null:
+			var smat := ShaderMaterial.new()
+			smat.shader = sky_sh
+			smat.set_shader_parameter("vault_color", fog_col.darkened(0.68))
+			smat.set_shader_parameter("horizon_color", fog_col.darkened(0.32))
+			smat.set_shader_parameter("clerestory_color", profile.get("sky_clerestory", Color(0.45, 0.62, 1.0)) as Color)
+			smat.set_shader_parameter("brazier_color", profile.get("sky_brazier", Color(1.0, 0.50, 0.16)) as Color)
+			smat.set_shader_parameter("clerestory_hdr", 2.2)
+			smat.set_shader_parameter("brazier_hdr", 3.2)
+			smat.set_shader_parameter("direct_bg_scale", 0.44)
+			sky.sky_material = smat
 
 	env.background_mode = Environment.BG_SKY
 	env.sky = sky
-	env.ambient_light_source = Environment.AMBIENT_SOURCE_COLOR
-	env.ambient_light_color = amb_col
+	env.ambient_light_source = Environment.AMBIENT_SOURCE_SKY
+	env.ambient_light_sky_contribution = 0.85
 	env.ambient_light_energy = float(profile["ambient_energy"])
+	env.reflected_light_source = Environment.REFLECTION_SOURCE_SKY
 	env.tonemap_mode = Environment.TONE_MAPPER_ACES
-	env.tonemap_exposure = 1.06
+	env.tonemap_exposure = 1.08
 	env.glow_enabled = true
-	env.glow_intensity = 0.78
-	env.glow_bloom = 0.16
-	env.glow_hdr_threshold = 1.02
+	env.glow_intensity = 0.35
+	env.glow_bloom = 0.08
+	env.glow_hdr_threshold = 1.15
 	env.fog_enabled = true
 	env.fog_light_color = fog_col
 	env.fog_light_energy = float(profile["fog_energy"])
 	env.fog_density = float(profile["fog_density"])
 	env.fog_aerial_perspective = 0.42
+	env.fog_sky_affect = 0.45
 
 	if moon == null:
 		moon = DirectionalLight3D.new()
@@ -469,7 +491,7 @@ static func _build_ground(parent: Node3D, profile: Dictionary, headless: bool) -
 	parent.add_child(ground_mi)
 
 
-static func _make_stone_material(albedo: Color = Color(0.32, 0.33, 0.37)) -> StandardMaterial3D:
+static func _make_stone_material(albedo: Color = Color(0.32, 0.33, 0.37), rough_val: float = 0.82, nrm_scale: float = 0.85) -> StandardMaterial3D:
 	var sm := StandardMaterial3D.new()
 	sm.albedo_color = albedo
 	var r_col := load("res://assets/textures/rock_color.jpg") as Texture2D
@@ -479,12 +501,30 @@ static func _make_stone_material(albedo: Color = Color(0.32, 0.33, 0.37)) -> Sta
 	if r_nrm != null:
 		sm.normal_enabled = true
 		sm.normal_texture = r_nrm
-		sm.normal_scale = 1.2
+		sm.normal_scale = nrm_scale
 	sm.uv1_triplanar = true
 	sm.uv1_scale = Vector3(0.45, 0.45, 0.45)
-	sm.roughness = 0.84
-	sm.metallic = 0.08
+	sm.roughness = rough_val
+	sm.metallic = 0.06
 	return sm
+
+
+static func _apply_gothic_stone_materials(root_node: Node3D, cache: Dictionary) -> void:
+	var stone_mat := cache.get("stone_mat") as Material
+	var dark_stone_mat := cache.get("dark_stone_mat") as Material
+	if stone_mat == null:
+		return
+	for n in root_node.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(s)
+			var mname := mat.resource_name if mat != null else ""
+			if "ObsidianStone" in mname and dark_stone_mat != null:
+				mi.set_surface_override_material(s, dark_stone_mat)
+			elif "GothicAshlarStone" in mname:
+				mi.set_surface_override_material(s, stone_mat)
 
 
 static func _make_iron_material(albedo: Color = Color(0.11, 0.12, 0.14)) -> StandardMaterial3D:
@@ -529,6 +569,7 @@ static func _build_boss_gate(parent: Node3D, gate_refs: Dictionary, profile: Dic
 		var gate_inst := gate_ps.instantiate() as Node3D
 		gate_inst.name = "KitBossGateModel"
 		gate_inst.scale = Vector3(1.95, 1.38, 1.38)
+		_apply_gothic_stone_materials(gate_inst, cache)
 		gate_root.add_child(gate_inst)
 		var port_bars := gate_inst.find_child("PortcullisBars", true, false) as Node3D
 		if port_bars != null:
@@ -641,6 +682,7 @@ static func _spawn_gothic_arch(parent: Node3D, pos: Vector3, scale_vec: Vector3,
 	arch.name = "GothicNaveArch"
 	arch.position = pos
 	arch.scale = scale_vec
+	_apply_gothic_stone_materials(arch, cache)
 	parent.add_child(arch)
 
 
@@ -652,6 +694,7 @@ static func _spawn_ruin_pillar(parent: Node3D, pos: Vector3, height: float, cach
 		holder.position = pos
 		var h_scale := clampf(height / 6.2, 0.72, 1.25)
 		holder.scale = Vector3(1.05, h_scale, 1.05)
+		_apply_gothic_stone_materials(holder, cache)
 		parent.add_child(holder)
 		return
 

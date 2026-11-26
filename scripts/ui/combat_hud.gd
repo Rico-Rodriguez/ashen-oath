@@ -425,7 +425,8 @@ func _on_action_btn_up(btn: Button) -> void:
 
 func _apply_safe_margins() -> void:
 	var m := UiThemeBuilder.get_safe_margins(root_ctrl)
-	top_margin.add_theme_constant_override("margin_top", 10 + int(m["top"]))
+	var top_pad := int(m["top"])
+	top_margin.add_theme_constant_override("margin_top", (6 + top_pad) if top_pad > 0 else 10)
 	top_margin.add_theme_constant_override("margin_left", 10 + int(m["left"]))
 	top_margin.add_theme_constant_override("margin_right", 10 + int(m["right"]))
 	thumbstick.safe_bottom = float(m["bottom"])
@@ -439,7 +440,8 @@ func _apply_handedness() -> void:
 		left_handed = bool((gs.settings as Dictionary).get("left_handed", false))
 
 	var m := UiThemeBuilder.get_safe_margins(root_ctrl)
-	var bot_pad := 18.0 + float(m["bottom"])
+	var raw_bot := int(m["bottom"])
+	var bot_pad := (12.0 + float(raw_bot)) if raw_bot > 0 else 18.0
 	var side_pad := 14.0 + float(m["left"] if left_handed else m["right"])
 	var cluster_w := 292.0
 	var cluster_h := 276.0

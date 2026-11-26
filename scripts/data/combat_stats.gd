@@ -25,12 +25,34 @@ var lantern_color: Color = Color(1.0, 0.66, 0.20, 1.0)
 var lantern_aura_dps: float = 0.0
 var armor_tier: int = 1
 var helm_tier: int = 1
+var cuirass_tier: int = 1
+var lantern_tier: int = 1
 var has_plume: bool = false
 var weapon_mesh_key: String = "zweihander"
 var offhand_mesh_key: String = ""
+var helm_key: String = ""
+var cuirass_key: String = ""
+var pauldron_key: String = ""
+var gauntlet_key: String = ""
+var greaves_key: String = ""
+var cloak_key: String = ""
 var weapon_vfx_profile: String = ""
 var weapon_sfx_event: String = "swing"
 
 
 func damage_taken_multiplier() -> float:
 	return 100.0 / (100.0 + maxf(0.0, armor))
+
+
+func to_slot_overrides() -> Dictionary:
+	return {
+		"helm_tier": helm_tier,
+		"cuirass_tier": cuirass_tier,
+		"lantern_tier": lantern_tier,
+		"helm_key": helm_key,
+		"cuirass_key": cuirass_key,
+		"pauldron_key": pauldron_key,
+		"gauntlet_key": gauntlet_key,
+		"greaves_key": greaves_key,
+		"cloak_key": cloak_key,
+	}

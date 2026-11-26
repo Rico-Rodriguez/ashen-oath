@@ -7,8 +7,12 @@ extends Node3D
 @export var height_meters: float = 1.95
 @export var yaw_offset_deg: float = 180.0
 @export var armor_tier: int = 1
+@export var helm_tier: int = 0
+@export var cuirass_tier: int = 0
+@export var lantern_tier: int = 1
 @export var weapon_key: String = ""
 @export var offhand_key: String = ""
+@export var helm_key: String = ""
 @export var has_plume: bool = false
 @export var lantern_color: Color = Color(1.0, 0.74, 0.30, 1.0)
 @export var anim_library_override: AnimationLibrary
@@ -16,6 +20,8 @@ extends Node3D
 @export var emission_override: Texture2D
 @export var emission_tint: Color = Color(1.0, 0.45, 0.16, 1.0)
 @export var emission_energy: float = 1.8
+
+var slot_overrides: Dictionary = {}
 
 var model_pivot: Node3D
 var model_instance: Node3D
@@ -191,6 +197,15 @@ func ensure_initialized() -> void:
 	_normalize_pivot_transform()
 
 	if is_hero:
+		var overrides := slot_overrides.duplicate()
+		if not overrides.has("cuirass_tier") and cuirass_tier > 0:
+			overrides["cuirass_tier"] = cuirass_tier
+		if not overrides.has("helm_tier") and helm_tier > 0:
+			overrides["helm_tier"] = helm_tier
+		if not overrides.has("lantern_tier"):
+			overrides["lantern_tier"] = lantern_tier
+		if not overrides.has("helm_key") and helm_key != "":
+			overrides["helm_key"] = helm_key
 		HeroRigDresser.dress(
 			self,
 			hero_class_id if hero_class_id != "" else actor_id,
@@ -198,7 +213,8 @@ func ensure_initialized() -> void:
 			weapon_key,
 			offhand_key,
 			has_plume,
-			lantern_color
+			lantern_color,
+			overrides
 		)
 	else:
 		_configure_enemy_materials()
@@ -244,13 +260,42 @@ func register_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Ar
 			_flash_std_base_energy.append(sm.emission_energy_multiplier)
 
 
+func append_shader_materials(armor_mats: Array[ShaderMaterial], cloth_mats: Array[ShaderMaterial] = [], std_mats: Array[StandardMaterial3D] = []) -> void:
+	for m in armor_mats:
+		if m != null and not _flash_shaders.has(m):
+			_flash_shaders.append(m)
+	for cm in cloth_mats:
+		if cm != null:
+			if not _cloth_shaders.has(cm):
+				_cloth_shaders.append(cm)
+			if not _flash_shaders.has(cm):
+				_flash_shaders.append(cm)
+			cm.set_shader_parameter("move_speed_norm", _move_blend)
+	for sm in std_mats:
+		if sm != null and not _flash_std_mats.has(sm):
+			_flash_std_mats.append(sm)
+			_flash_std_had_emit.append(sm.emission_enabled)
+			_flash_std_base_emit.append(sm.emission)
+			_flash_std_base_energy.append(sm.emission_energy_multiplier)
+
+
 func set_enrage_embers(active: bool) -> void:
 	ensure_initialized()
 	for i in _flash_std_mats.size():
 		var m := _flash_std_mats[i]
 		if m == null:
 			continue
-		if m.resource_name == "EmissiveCinder" or _flash_std_had_emit[i]:
+		if m.emission_texture != null:
+			var e_col := Color(1.0, 0.68, 0.36) if active else Color.WHITE
+			var e_pow := 4.4 if active else maxf(emission_energy, 1.8)
+			m.emission_enabled = true
+			m.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
+			m.emission = e_col
+			m.emission_energy_multiplier = e_pow
+			_flash_std_had_emit[i] = true
+			_flash_std_base_emit[i] = e_col
+			_flash_std_base_energy[i] = e_pow
+		elif m.resource_name == "EmissiveCinder" or _flash_std_had_emit[i]:
 			var e_col := Color(1.0, 0.34, 0.08) if active else Color(0.92, 0.28, 0.06)
 			var e_pow := 3.6 if active else 1.5
 			m.emission_enabled = true
@@ -467,7 +512,7 @@ func _compute_posed_model_aabb() -> AABB:
 		var mi := n as MeshInstance3D
 		if not _is_visible_in_hierarchy(mi, model_instance) or mi.mesh == null:
 			continue
-		if String(mi.name).begins_with("Forged"):
+		if String(mi.name).begins_with("Forged") or String(mi.name).begins_with("ModularSlot_"):
 			continue
 
 		var skel_node := mi.get_node_or_null(mi.skeleton) as Skeleton3D if not mi.skeleton.is_empty() else skeleton
@@ -541,22 +586,71 @@ func _configure_enemy_materials() -> void:
 	_flash_std_had_emit.clear()
 
 	if is_unified_kit():
+		_flash_shaders.clear()
+		_cloth_shaders.clear()
+		var cloak_shader := load(HeroRigDresser.CLOAK_SHADER_PATH) as Shader
 		for n in model_instance.find_children("*", "MeshInstance3D", true, false):
 			var mi := n as MeshInstance3D
 			if not mi.visible or mi.mesh == null:
 				continue
+			var nm := String(mi.name)
+			var is_cloak_mesh := nm == "Slot_Cloak" or nm.begins_with("Slot_Cloak_") or nm.begins_with("Slot_Cloak.")
 			for s in mi.mesh.get_surface_count():
 				var active := mi.get_active_material(s)
+				var mname := active.resource_name if active != null else ""
+				if (is_cloak_mesh or mname == "CapeCloth") and cloak_shader != null:
+					var base_c := Color(0.24, 0.032, 0.038)
+					var trim_c := Color(0.46, 0.28, 0.10)
+					var cmat := ShaderMaterial.new()
+					cmat.shader = cloak_shader
+					cmat.set_shader_parameter("cloth_color", base_c)
+					cmat.set_shader_parameter("hem_ash_color", base_c.darkened(0.60))
+					cmat.set_shader_parameter("trim_color", trim_c)
+					cmat.set_shader_parameter("sway_amplitude", 0.095)
+					cmat.set_shader_parameter("billow_sign", -1.0)
+					cmat.set_shader_parameter("move_speed_norm", _move_blend)
+					cmat.set_shader_parameter("hit_flash", 0.0)
+					mi.set_surface_override_material(s, cmat)
+					_cloth_shaders.append(cmat)
+					_flash_shaders.append(cmat)
+					continue
 				var sm: StandardMaterial3D
 				if active is StandardMaterial3D:
 					sm = (active as StandardMaterial3D).duplicate() as StandardMaterial3D
 				else:
 					sm = StandardMaterial3D.new()
+				if sm.emission_texture != null:
+					sm.emission_enabled = true
+					sm.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
+					if sm.emission.r + sm.emission.g + sm.emission.b < 0.05:
+						sm.emission = Color.WHITE
+					sm.emission_energy_multiplier = maxf(sm.emission_energy_multiplier, 1.8)
 				mi.set_surface_override_material(s, sm)
 				_flash_std_mats.append(sm)
 				_flash_std_had_emit.append(sm.emission_enabled)
 				_flash_std_base_emit.append(sm.emission)
 				_flash_std_base_energy.append(sm.emission_energy_multiplier)
+
+		var skel_world_scale := maxf(skeleton.global_transform.basis.get_scale().y, 0.0001)
+		var inv_skel_scale := 1.0 / skel_world_scale
+		var weapon_scale_mult := clampf(height_meters / 1.95, 0.72, 2.20)
+		if weapon_key != "" and weapon_key != "none":
+			var w_tier := 4 if height_meters >= 2.8 else 2
+			var w_glow := emission_tint if emission_tint.r + emission_tint.g + emission_tint.b > 0.1 else Color(1.0, 0.48, 0.14, 1.0)
+			HeroRigDresser.mount_kit_weapon(self, skeleton, weapon_key, w_tier, w_glow, inv_skel_scale, weapon_scale_mult)
+		if cast_origin_marker == null:
+			var hand_l_idx := skeleton.find_bone("hand_l")
+			if hand_l_idx >= 0:
+				var ba_l := BoneAttachment3D.new()
+				ba_l.name = "ForgedAttach_KitCastHandL"
+				ba_l.bone_name = "hand_l"
+				ba_l.bone_idx = hand_l_idx
+				skeleton.add_child(ba_l)
+				var cast_m := Marker3D.new()
+				cast_m.name = "CastOrigin"
+				cast_m.position = Vector3(0.0, 0.08 * weapon_scale_mult * inv_skel_scale, 0.0)
+				ba_l.add_child(cast_m)
+				cast_origin_marker = cast_m
 		return
 
 	var troll_veins := {}
@@ -651,9 +745,13 @@ func _apply_hit_flash_level(level: float) -> void:
 			continue
 		if lv > 0.001:
 			m.emission_enabled = true
+			if m.emission_texture != null:
+				m.emission_operator = BaseMaterial3D.EMISSION_OP_ADD
 			m.emission = _flash_std_base_emit[i].lerp(Color(1.0, 0.90, 0.76), lv)
 			m.emission_energy_multiplier = lerpf(_flash_std_base_energy[i], 2.6, lv)
 		else:
+			if m.emission_texture != null:
+				m.emission_operator = BaseMaterial3D.EMISSION_OP_MULTIPLY
 			m.emission_enabled = _flash_std_had_emit[i]
 			m.emission = _flash_std_base_emit[i]
 			m.emission_energy_multiplier = _flash_std_base_energy[i]

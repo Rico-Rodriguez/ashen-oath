@@ -135,6 +135,7 @@ func refresh_combat_stats(new_stats: CombatStats, heal_pct_of_max: float = 0.0) 
 	var old_armor_tier := stats.armor_tier if stats != null else 1
 	var old_plume := stats.has_plume if stats != null else false
 	var old_lantern := stats.lantern_color if stats != null else Color.WHITE
+	var old_overrides := stats.to_slot_overrides() if stats != null else {}
 
 	stats = new_stats
 	if stats.max_hp > old_max:
@@ -144,12 +145,14 @@ func refresh_combat_stats(new_stats: CombatStats, heal_pct_of_max: float = 0.0) 
 	current_hp = clampf(current_hp, 0.0, stats.max_hp)
 	_recompute_cooldown_caps()
 
+	var new_overrides := stats.to_slot_overrides()
 	if visual != null and (
 		old_mesh != stats.weapon_mesh_key
 		or old_offhand != stats.offhand_mesh_key
 		or old_armor_tier != stats.armor_tier
 		or old_plume != stats.has_plume
 		or not old_lantern.is_equal_approx(stats.lantern_color)
+		or old_overrides != new_overrides
 	):
 		HeroRigDresser.dress(
 			visual,
@@ -158,7 +161,8 @@ func refresh_combat_stats(new_stats: CombatStats, heal_pct_of_max: float = 0.0) 
 			stats.weapon_mesh_key,
 			stats.offhand_mesh_key,
 			stats.has_plume,
-			stats.lantern_color
+			stats.lantern_color,
+			new_overrides
 		)
 
 	health_changed.emit(current_hp, stats.max_hp, ward_hp)
@@ -831,13 +835,19 @@ func _mount_visual() -> void:
 	var ps := load(class_def.actor_scene_path) as PackedScene
 	if ps == null:
 		return
+	var slot_ov := stats.to_slot_overrides()
 	visual = ps.instantiate() as ActorVisual
 	visual.hero_class_id = class_id
 	visual.armor_tier = stats.armor_tier
+	visual.helm_tier = stats.helm_tier
+	visual.cuirass_tier = stats.cuirass_tier
+	visual.lantern_tier = stats.lantern_tier
 	visual.weapon_key = stats.weapon_mesh_key
 	visual.offhand_key = stats.offhand_mesh_key
+	visual.helm_key = stats.helm_key
 	visual.has_plume = stats.has_plume
 	visual.lantern_color = stats.lantern_color
+	visual.slot_overrides = slot_ov
 	add_child(visual)
 	HeroRigDresser.dress(
 		visual,
@@ -846,7 +856,8 @@ func _mount_visual() -> void:
 		stats.weapon_mesh_key,
 		stats.offhand_mesh_key,
 		stats.has_plume,
-		stats.lantern_color
+		stats.lantern_color,
+		slot_ov
 	)
 
 

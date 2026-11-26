@@ -100,6 +100,7 @@ func _build_shrine_geometry() -> void:
 		var inst := shrine_ps.instantiate() as Node3D
 		inst.name = "DarkShrineModel"
 		inst.scale = Vector3.ONE * 1.10
+		_apply_shrine_stone_materials(inst)
 		add_child(inst)
 		var crystal := inst.find_child("ShrineCrystal", true, false) as Node3D
 		if crystal != null:
@@ -152,6 +153,40 @@ func _build_shrine_geometry() -> void:
 	_shrine_light.position = Vector3(0.0, 2.95, 0.0)
 	_shrine_light.shadow_enabled = false
 	add_child(_shrine_light)
+
+
+static func _make_shrine_stone_material(albedo: Color, rough_val: float) -> StandardMaterial3D:
+	var sm := StandardMaterial3D.new()
+	sm.albedo_color = albedo
+	var r_col := load("res://assets/textures/rock_color.jpg") as Texture2D
+	var r_nrm := load("res://assets/textures/rock_normal.jpg") as Texture2D
+	if r_col != null:
+		sm.albedo_texture = r_col
+	if r_nrm != null:
+		sm.normal_enabled = true
+		sm.normal_texture = r_nrm
+		sm.normal_scale = 0.85
+	sm.uv1_triplanar = true
+	sm.uv1_scale = Vector3(0.45, 0.45, 0.45)
+	sm.roughness = rough_val
+	sm.metallic = 0.06
+	return sm
+
+
+static func _apply_shrine_stone_materials(root_node: Node3D) -> void:
+	var stone_mat := _make_shrine_stone_material(Color(0.44, 0.46, 0.52), 0.82)
+	var dark_stone_mat := _make_shrine_stone_material(Color(0.24, 0.26, 0.32), 0.78)
+	for n in root_node.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(s)
+			var mname := mat.resource_name if mat != null else ""
+			if "ObsidianStone" in mname:
+				mi.set_surface_override_material(s, dark_stone_mat)
+			elif "GothicAshlarStone" in mname:
+				mi.set_surface_override_material(s, stone_mat)
 
 
 func _get_hero() -> Node3D:

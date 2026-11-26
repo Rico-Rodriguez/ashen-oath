@@ -52,13 +52,14 @@ void fragment() {
 	float d_top = 1.0 - cell.y;
 	float edge_dist = min(min(d_left, d_right), min(d_bot, d_top));
 
-	float chip = (vnoise(w * 4.6 + th * 13.7) - 0.5) * 0.024;
-	float mortar = 1.0 - smoothstep(0.022, 0.056, edge_dist + chip);
-	float bevel = smoothstep(0.024, 0.058, edge_dist) * (1.0 - smoothstep(0.058, 0.14, edge_dist));
+	float chip = (vnoise(w * 5.2 + th * 13.7) - 0.5) * 0.022;
+	float mortar = 1.0 - smoothstep(0.018, 0.042, edge_dist + chip);
+	float ao_groove = smoothstep(0.022, 0.11, edge_dist + chip);
+	float bevel = smoothstep(0.020, 0.052, edge_dist) * (1.0 - smoothstep(0.052, 0.135, edge_dist));
 
 	float crack_field = abs(vnoise(w * 2.25 + vec2(th * 9.7, th2 * 5.3)) - 0.5);
 	float crack_gate = step(0.42, th);
-	float crack = (1.0 - smoothstep(0.010, 0.032, crack_field)) * crack_gate * (1.0 - mortar);
+	float crack = (1.0 - smoothstep(0.008, 0.028, crack_field)) * crack_gate * (1.0 - mortar);
 
 	float center_nave = 1.0 - smoothstep(5.8, 11.2, abs(w.x) + (n_detail - 0.5) * 0.9);
 	float boss_court = 1.0 - smoothstep(11.5, 16.0, length(w - vec2(0.0, -45.0)) + (n_macro - 0.5) * 1.1);
@@ -78,26 +79,27 @@ void fragment() {
 	vec3 f_tex = texture(forest_albedo, uv_f).rgb;
 	vec3 d_tex = texture(dirt_albedo, uv_d).rgb;
 
-	vec3 slab_tint = mix(vec3(0.24, 0.25, 0.28), vec3(0.36, 0.37, 0.41), th);
-	slab_tint += vec3(0.025, 0.018, 0.010) * (th2 - 0.5);
-	vec3 stone_col = s_tex * slab_tint * 1.45;
-	stone_col *= mix(1.0, 1.16, bevel * (1.0 - crack));
-	stone_col *= mix(1.0, 1.18, nave_border * 0.65);
+	vec3 slab_tint = mix(vec3(0.14, 0.15, 0.18), vec3(0.27, 0.28, 0.33), th);
+	slab_tint += vec3(0.022, 0.016, 0.010) * (th2 - 0.5);
+	vec3 stone_col = s_tex * slab_tint * 1.38;
+	stone_col *= mix(0.50, 1.04, ao_groove);
+	stone_col *= mix(1.0, 1.24, bevel * (1.0 - crack));
+	stone_col *= mix(1.0, 1.18, nave_border * 0.55);
 
-	vec3 mortar_col = vec3(0.055, 0.058, 0.065) * mix(0.85, 1.15, n_detail);
-	stone_col = mix(stone_col, mortar_col, clamp(mortar * 0.90 + crack * 0.72, 0.0, 1.0));
+	vec3 mortar_col = vec3(0.020, 0.022, 0.028) * mix(0.82, 1.18, n_detail);
+	stone_col = mix(stone_col, mortar_col, clamp(mortar * 0.94 + crack * 0.78, 0.0, 1.0));
 
-	vec3 outer_col = mix(d_tex * vec3(0.22, 0.21, 0.20), f_tex * vec3(0.18, 0.21, 0.19), n_detail);
+	vec3 outer_col = mix(d_tex * vec3(0.18, 0.17, 0.16), f_tex * vec3(0.14, 0.17, 0.15), n_detail);
 	vec3 alb = mix(stone_col, outer_col, moss_weight);
 
-	vec3 tint_norm = clamp(ground_tint * 2.45, vec3(0.58), vec3(1.22));
-	alb *= tint_norm * mix(0.82, 1.10, n_macro);
+	vec3 tint_norm = clamp(ground_tint * 2.35, vec3(0.52), vec3(1.18));
+	alb *= tint_norm * mix(0.68, 1.12, n_macro);
 
 	float flank_dark = smoothstep(11.5, 21.0, abs(w.x));
-	alb *= mix(1.0, 0.38, flank_dark);
+	alb *= mix(1.0, 0.34, flank_dark);
 
 	vec2 bevel_grad = vec2(0.0);
-	float bevel_str = bevel * 0.42 * flag_mask;
+	float bevel_str = bevel * 0.82 * flag_mask;
 	if (d_left < 0.14) bevel_grad.x -= bevel_str;
 	if (d_right < 0.14) bevel_grad.x += bevel_str;
 	if (d_bot < 0.14) bevel_grad.y -= bevel_str;
@@ -106,18 +108,24 @@ void fragment() {
 	vec3 s_nrm = texture(stone_normal, uv_s).rgb * 2.0 - 1.0;
 	vec3 f_nrm = texture(forest_normal, uv_f).rgb * 2.0 - 1.0;
 	vec3 raw_n = mix(s_nrm, f_nrm, moss_weight);
-	raw_n.xy = raw_n.xy * 0.52 + bevel_grad;
-	raw_n.z = max(raw_n.z, 0.50);
+	raw_n.xy = raw_n.xy * 0.58 + bevel_grad;
+	raw_n.z = max(raw_n.z, 0.45);
 	vec3 nrm = normalize(raw_n);
 
-	float moisture = smoothstep(0.56, 0.78, vnoise(w * 0.22 + vec2(3.7, 8.2))) * (1.0 - mortar) * flag_mask;
-	float base_rgh = mix(0.82, 0.96, clamp(mortar + moss_weight * 0.5, 0.0, 1.0));
-	float final_rgh = mix(base_rgh, 0.34, moisture * 0.75);
-	alb = mix(alb, alb * 0.74, moisture * 0.42);
+	float wet_noise = vnoise(w * 0.24 + vec2(3.7, 8.2)) * 0.65 + vnoise(w * 0.68 + vec2(9.1, 2.4)) * 0.35;
+	float moisture = smoothstep(0.42, 0.72, wet_noise) * (1.0 - mortar) * flag_mask;
+	float puddle = smoothstep(0.66, 0.82, wet_noise + (th - 0.5) * 0.12) * (1.0 - mortar) * flag_mask;
+	nrm = normalize(mix(nrm, vec3(0.0, 0.0, 1.0), puddle * 0.62));
+
+	float base_rgh = mix(0.80, 0.96, clamp(mortar + moss_weight * 0.5, 0.0, 1.0));
+	float final_rgh = mix(base_rgh, 0.26, moisture * 0.78);
+	final_rgh = mix(final_rgh, 0.11, puddle * 0.85);
+	alb = mix(alb, alb * 0.66, clamp(moisture * 0.40 + puddle * 0.35, 0.0, 0.72));
 
 	ALBEDO = alb;
 	NORMAL_MAP = nrm * 0.5 + 0.5;
-	NORMAL_MAP_DEPTH = 0.72;
+	NORMAL_MAP_DEPTH = 0.96;
 	ROUGHNESS = final_rgh;
-	METALLIC = 0.06 * stone_weight * (1.0 - mortar);
+	SPECULAR = mix(0.46, 0.78, clamp(moisture * 0.5 + puddle, 0.0, 1.0)) * (1.0 - mortar);
+	METALLIC = 0.04 * stone_weight * (1.0 - mortar);
 }

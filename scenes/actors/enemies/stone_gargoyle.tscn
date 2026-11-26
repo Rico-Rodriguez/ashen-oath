@@ -8,6 +8,7 @@ script = ExtResource("1")
 actor_id = "stone_gargoyle"
 height_meters = 2.25
 yaw_offset_deg = 180.0
+weapon_key = "halberd"
 
 [node name="ModelPivot" type="Node3D" parent="."]
 

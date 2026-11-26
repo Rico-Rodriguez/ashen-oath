@@ -100,19 +100,21 @@ func _apply_safe_margins() -> void:
 	var left_pad := int(m["left"])
 	var right_pad := int(m["right"])
 
-	var h_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8)
-	h_box.content_margin_top = 8.0 + float(top_pad)
+	var h_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 6)
+	h_box.content_margin_top = 6.0 + float(top_pad)
+	h_box.content_margin_bottom = 6.0
 	h_box.content_margin_left = 12.0 + float(left_pad)
 	h_box.content_margin_right = 12.0 + float(right_pad)
 	header_panel.add_theme_stylebox_override("panel", h_box)
-	header_panel.custom_minimum_size.y = 58.0 + float(top_pad)
+	header_panel.custom_minimum_size.y = 52.0 + float(top_pad)
 
-	var n_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 8)
-	n_box.content_margin_bottom = 8.0 + float(bot_pad)
+	var n_box := UiThemeBuilder.make_box(UiThemeBuilder.BG_IRON, UiThemeBuilder.BORDER_BRONZE, 1, 0, 12, 4)
+	n_box.content_margin_top = 4.0
+	n_box.content_margin_bottom = 4.0 + float(bot_pad)
 	n_box.content_margin_left = 12.0 + float(left_pad)
 	n_box.content_margin_right = 12.0 + float(right_pad)
 	nav_panel.add_theme_stylebox_override("panel", n_box)
-	nav_panel.custom_minimum_size.y = 68.0 + float(bot_pad)
+	nav_panel.custom_minimum_size.y = 58.0 + float(bot_pad)
 
 
 func switch_tab(tab: Tab) -> void:

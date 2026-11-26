@@ -244,24 +244,24 @@ const HERO_SPECS := [
 		"tier": 2,
 		"wpn": "runed_staff",
 		"off": "",
-		"plume": true,
+		"plume": false,
 		"lantern": Color(0.32, 0.74, 1.0),
-		"cam_pos": Vector3(0.58, 1.68, -2.18),
-		"look_at": Vector3(-0.04, 1.58, 0.0),
-		"fov": 28.0,
+		"cam_pos": Vector3(-0.34, 1.66, -2.62),
+		"look_at": Vector3(0.26, 1.56, -0.22),
+		"fov": 29.0,
 		"rim_col": Color(0.35, 0.75, 1.0),
 	},
 	{
 		"id": "revenant",
 		"scene": "res://scenes/actors/heroes/revenant.tscn",
-		"tier": 3,
+		"tier": 4,
 		"wpn": "halberd",
 		"off": "",
 		"plume": true,
 		"lantern": Color(0.96, 0.22, 0.28),
-		"cam_pos": Vector3(-0.56, 1.70, -2.12),
-		"look_at": Vector3(0.02, 1.60, 0.0),
-		"fov": 28.0,
+		"cam_pos": Vector3(-0.62, 1.68, -2.64),
+		"look_at": Vector3(0.08, 1.54, 0.0),
+		"fov": 30.0,
 		"rim_col": Color(0.95, 0.28, 0.32),
 	},
 ]
@@ -281,7 +281,7 @@ const ENEMY_SPECS := [
 		"scene": "res://scenes/actors/enemies/crypt_batlord.tscn",
 		"cam_rel": Vector3(-0.34, 0.76, -0.98),
 		"look_y": 0.78,
-		"dist_mult": 1.14,
+		"dist_mult": 1.03,
 		"fov": 31.0,
 		"rim_col": Color(1.0, 0.36, 0.12),
 	},
@@ -325,8 +325,8 @@ const ENEMY_SPECS := [
 		"id": "barrow_troll",
 		"scene": "res://scenes/actors/enemies/barrow_troll.tscn",
 		"cam_rel": Vector3(-0.36, 0.78, -0.96),
-		"look_y": 0.75,
-		"dist_mult": 1.16,
+		"look_y": 0.76,
+		"dist_mult": 1.04,
 		"fov": 31.0,
 		"rim_col": Color(1.0, 0.38, 0.10),
 	},
@@ -359,8 +359,14 @@ const ITEM_KEYS := [
 	"shield_tower",
 	"helm_iron",
 	"helm_plume",
+	"helm_t2",
+	"helm_t3",
+	"helm_t4",
 	"cuirass_plate",
 	"waist_lantern",
+	"waist_lantern_soul",
+	"waist_lantern_blight",
+	"waist_lantern_blood",
 ]
 
 
@@ -399,7 +405,10 @@ func _bake_all() -> void:
 	for _f in range(8):
 		await RenderingServer.frame_post_draw
 
-	var sheet := Image.create(256 * 6, 256 * 5, false, Image.FORMAT_RGBA8)
+	var total_tiles := portrait_jobs.size() + item_jobs.size() + skill_jobs.size()
+	var sheet_cols := 6
+	var sheet_rows := maxi(1, ceili(float(total_tiles) / float(sheet_cols)))
+	var sheet := Image.create(256 * sheet_cols, 256 * sheet_rows, false, Image.FORMAT_RGBA8)
 	sheet.fill(Color(0.04, 0.04, 0.05, 1.0))
 	var sheet_idx := 0
 
@@ -438,7 +447,7 @@ func _bake_all() -> void:
 		var sx := (sheet_idx % 6) * 256
 		var sy := (sheet_idx / 6) * 256
 		if sy + 256 <= sheet.get_height():
-			sheet.blit_rect(preview_up, Rect2i(0, 0, 256, 256), Vector2i(sx, sy))
+			sheet.blend_rect(preview_up, Rect2i(0, 0, 256, 256), Vector2i(sx, sy))
 		sheet_idx += 1
 		vp.queue_free()
 
@@ -458,7 +467,7 @@ func _bake_all() -> void:
 		var sx := (sheet_idx % 6) * 256
 		var sy := (sheet_idx / 6) * 256
 		if sy + 256 <= sheet.get_height():
-			sheet.blit_rect(preview_up, Rect2i(0, 0, 256, 256), Vector2i(sx, sy))
+			sheet.blend_rect(preview_up, Rect2i(0, 0, 256, 256), Vector2i(sx, sy))
 		sheet_idx += 1
 		vp.queue_free()
 
@@ -558,7 +567,16 @@ func _get_actor_bone_world(actor: ActorVisual, bone_name: String, fallback: Vect
 
 
 func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
-	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.095), spec["rim_col"] as Color, 2.55)
+	var is_oath := str(spec["id"]) == "oathbreaker"
+	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.095), spec["rim_col"] as Color, 2.05 if is_oath else 2.55)
+	if is_oath:
+		for ch in (st["vp"] as SubViewport).get_children():
+			if ch is WorldEnvironment:
+				var env := (ch as WorldEnvironment).environment
+				if env != null:
+					env.glow_intensity = 0.28
+					env.glow_bloom = 0.05
+					env.glow_hdr_threshold = 1.2
 	var ps := load(str(spec["scene"])) as PackedScene
 	var actor := ps.instantiate() as ActorVisual
 	(st["vp"] as SubViewport).add_child(actor)
@@ -584,7 +602,7 @@ func _build_hero_portrait_stage(spec: Dictionary) -> Dictionary:
 		var focus := chest_p.lerp(head_p, 0.56)
 		var fill_warm := OmniLight3D.new()
 		fill_warm.light_color = Color(1.0, 0.68, 0.34)
-		fill_warm.light_energy = 1.65
+		fill_warm.light_energy = 1.10 if is_oath else 1.65
 		fill_warm.omni_range = 5.0
 		fill_warm.position = focus + Vector3(0.85, 0.25, -1.15)
 		(st["vp"] as SubViewport).add_child(fill_warm)
@@ -656,14 +674,31 @@ func _build_enemy_portrait_stage(spec: Dictionary) -> Dictionary:
 
 func _build_item_stage(key: String) -> Dictionary:
 	var accent := Color(0.95, 0.68, 0.28)
-	if key == "runed_staff":
-		accent = Color(0.35, 0.76, 1.0)
-	elif key == "blade_oarimaar":
-		accent = Color(1.0, 0.36, 0.14)
-	elif key == "waist_lantern":
-		accent = Color(1.0, 0.68, 0.20)
+	var key_energy := 2.05
+	match key:
+		"runed_staff":
+			accent = Color(0.35, 0.76, 1.0)
+		"blade_oarimaar", "helm_t4":
+			accent = Color(1.0, 0.30, 0.12)
+		"waist_lantern":
+			accent = GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD)
+		"waist_lantern_soul":
+			accent = GameEnums.lantern_color(GameEnums.LanternAspect.SOUL_BLUE)
+		"waist_lantern_blight":
+			accent = GameEnums.lantern_color(GameEnums.LanternAspect.BLIGHT_GREEN)
+		"waist_lantern_blood":
+			accent = GameEnums.lantern_color(GameEnums.LanternAspect.BLOOD_CRIMSON)
+		"helm_t2", "shield_heater":
+			accent = Color(0.54, 0.74, 1.0)
+		"helm_t3", "shield_tower", "cuirass_plate":
+			accent = Color(1.0, 0.76, 0.30)
+			key_energy = 2.15
+		"helm_iron", "shield_round":
+			accent = Color(0.84, 0.66, 0.44)
+		"helm_plume":
+			accent = Color(0.98, 0.56, 0.24)
 
-	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.092), accent, 1.95)
+	var st := _make_studio_viewport(Vector2i(512, 512), Color(0.065, 0.072, 0.092), accent, key_energy)
 	var vp: SubViewport = st["vp"]
 	var holder := Node3D.new()
 	holder.name = "ItemHolder"
@@ -691,17 +726,32 @@ func _build_item_stage(key: String) -> Dictionary:
 		var center := world_box.position + world_box.size * 0.5
 		holder.position -= center
 		if key in ["halberd", "runed_staff"]:
-			holder.position -= Vector3(0.08, 0.08, 0.0)
+			holder.position -= Vector3(0.02, 0.02, 0.0)
 
 	var final_box := _compute_node_aabb(holder)
 	var span := maxf(0.15, maxf(final_box.size.x, final_box.size.y))
 	var fov_deg := 26.0
-	var fill_margin := 1.12
+	var fill_margin := 1.04
+	var depth_pad := 0.55
 	if key in ["halberd", "runed_staff"]:
-		fill_margin = 0.84
+		fill_margin = 1.02
 	elif key in ["zweihander", "bastardsword", "blade_oarimaar"]:
 		fill_margin = 0.96
-	var dist := (span * 0.5 * fill_margin) / tan(deg_to_rad(fov_deg * 0.5)) + final_box.size.z * 0.65
+	elif key in ["shield_round", "shield_heater", "shield_tower"]:
+		fill_margin = 1.06
+	elif key == "cuirass_plate":
+		fill_margin = 0.96
+		depth_pad = 0.45
+	elif key.begins_with("waist_lantern"):
+		fill_margin = 0.98
+		depth_pad = 0.45
+	elif key == "helm_plume":
+		fill_margin = 0.98
+		depth_pad = 0.42
+	elif key in ["helm_iron", "helm_t2", "helm_t3", "helm_t4"]:
+		fill_margin = 0.92
+		depth_pad = 0.42
+	var dist := (span * 0.5 * fill_margin) / tan(deg_to_rad(fov_deg * 0.5)) + final_box.size.z * depth_pad
 
 	var cam: Camera3D = st["cam"]
 	cam.fov = fov_deg
@@ -709,9 +759,17 @@ func _build_item_stage(key: String) -> Dictionary:
 
 	(st["key"] as DirectionalLight3D).look_at_from_position(Vector3(-2.2, 2.6, -3.2), Vector3.ZERO, Vector3.UP)
 	(st["cool_rim"] as DirectionalLight3D).look_at_from_position(Vector3(2.4, 1.8, 2.4), Vector3.ZERO, Vector3.UP)
-	(st["accent_rim"] as OmniLight3D).position = Vector3(0.85, -0.55, -1.1)
-	(st["accent_rim"] as OmniLight3D).light_energy = 1.65
-	(st["accent_rim"] as OmniLight3D).omni_range = 4.5
+	var accent_light := st["accent_rim"] as OmniLight3D
+	if key in ["zweihander", "blade_oarimaar", "bastardsword", "halberd", "runed_staff"]:
+		accent_light.position = Vector3(-0.75, -0.65, -1.25)
+		accent_light.light_energy = 1.55
+	elif key == "helm_t4":
+		accent_light.position = Vector3(0.85, -0.45, -1.25)
+		accent_light.light_energy = 1.05
+	else:
+		accent_light.position = Vector3(0.85, -0.55, -1.1)
+		accent_light.light_energy = 1.55
+	accent_light.omni_range = 4.5
 
 	st["id"] = key
 	return st
@@ -732,70 +790,60 @@ func _instantiate_item_model(key: String) -> Node3D:
 			var ps := load("res://assets/models/forged/runed_staff.glb") as PackedScene
 			if ps != null:
 				var inst := ps.instantiate() as Node3D
-				HeroRigDresser._tint_staff_crystal(inst, Color(0.34, 0.78, 1.0))
+				HeroRigDresser._tint_staff_crystal(inst, Color(0.32, 0.82, 1.0))
+				_boost_studio_emission(inst, 4.8)
+				var staff_glow := OmniLight3D.new()
+				staff_glow.light_color = Color(0.28, 0.80, 1.0)
+				staff_glow.light_energy = 2.2
+				staff_glow.omni_range = 1.8
+				staff_glow.position = Vector3(0.0, 0.72, 0.0)
+				inst.add_child(staff_glow)
 				root_node.add_child(inst)
 		"bastardsword":
-			var mesh := HeroRigDresser._get_bastardsword_mesh(null)
-			if mesh != null:
-				var mi := MeshInstance3D.new()
-				mi.mesh = mesh
-				root_node.add_child(mi)
+			var ps := load("res://assets/models/forged/bastardsword.glb") as PackedScene
+			if ps != null:
+				root_node.add_child(ps.instantiate())
 		"blade_oarimaar":
-			var mesh := load("res://assets/models/gear/blade_oarimaar.res") as Mesh
-			if mesh != null:
-				var mi := MeshInstance3D.new()
-				mi.mesh = mesh
-				for s in mesh.get_surface_count():
-					var mat := mesh.surface_get_material(s)
-					if mat is StandardMaterial3D:
-						var dup := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
-						dup.albedo_color = Color(0.55, 0.48, 0.46)
-						dup.metallic = 0.85
-						dup.roughness = 0.24
-						dup.emission_enabled = true
-						if dup.emission_texture == null:
-							dup.emission_texture = load("res://assets/models/gear/tex/blade_oarimaar_0_emission.png") as Texture2D
-						dup.emission = Color(1.0, 0.36, 0.10)
-						dup.emission_energy_multiplier = 3.8
-						mi.set_surface_override_material(s, dup)
-				root_node.add_child(mi)
+			var ps := load("res://assets/models/forged/warden_greatsword.glb") as PackedScene
+			if ps != null:
+				var inst := ps.instantiate() as Node3D
+				HeroRigDresser._style_weapon_tier(inst, 4, true)
+				_boost_studio_emission(inst, 3.8)
+				root_node.add_child(inst)
 		"shield_round", "shield_heater", "shield_tower":
-			var path := str(HeroRigDresser.GEAR_SHIELD_PATHS.get(key, ""))
-			var mesh := load(path) as Mesh
-			if mesh != null:
-				var mi := MeshInstance3D.new()
-				mi.mesh = mesh
-				root_node.add_child(mi)
-		"waist_lantern":
+			root_node.add_child(_build_sculpted_shield(key))
+		"waist_lantern", "waist_lantern_soul", "waist_lantern_blight", "waist_lantern_blood":
 			var ps := load("res://assets/models/forged/waist_lantern.glb") as PackedScene
 			if ps != null:
 				var inst := ps.instantiate() as Node3D
-				for n in inst.find_children("*", "MeshInstance3D", true, false):
-					var mi := n as MeshInstance3D
-					if mi.mesh == null:
-						continue
-					for s in mi.mesh.get_surface_count():
-						var mat := mi.get_active_material(s)
-						if mat != null and mat.resource_name == "LanternCore":
-							var cmat := StandardMaterial3D.new()
-							cmat.albedo_color = Color(1.0, 0.82, 0.42)
-							cmat.roughness = 0.15
-							cmat.emission_enabled = true
-							cmat.emission = Color(1.0, 0.64, 0.16)
-							cmat.emission_energy_multiplier = 4.2
-							mi.set_surface_override_material(s, cmat)
+				var lcol := GameEnums.lantern_color(GameEnums.LanternAspect.EMBER_GOLD)
+				match key:
+					"waist_lantern_soul":
+						lcol = GameEnums.lantern_color(GameEnums.LanternAspect.SOUL_BLUE)
+					"waist_lantern_blight":
+						lcol = GameEnums.lantern_color(GameEnums.LanternAspect.BLIGHT_GREEN)
+					"waist_lantern_blood":
+						lcol = GameEnums.lantern_color(GameEnums.LanternAspect.BLOOD_CRIMSON)
+				HeroRigDresser._tint_lantern_core(inst, lcol, 4.4)
 				var glow := OmniLight3D.new()
-				glow.light_color = Color(1.0, 0.68, 0.22)
+				glow.light_color = lcol
 				glow.light_energy = 2.2
-				glow.omni_range = 2.0
+				glow.omni_range = 1.8
+				glow.position = Vector3(0.0, -0.14, 0.0)
 				inst.add_child(glow)
 				root_node.add_child(inst)
 		"helm_iron":
-			root_node.add_child(_build_forged_greathelm(false))
+			root_node.add_child(_build_oathbreaker_slot_model(["Slot_Helm"], 1))
 		"helm_plume":
-			root_node.add_child(_build_forged_greathelm(true))
+			root_node.add_child(_build_oathbreaker_slot_model(["Slot_Helm", "Slot_Plume"], 3, Color(0.64, 0.56, 0.44)))
+		"helm_t2":
+			root_node.add_child(_build_sculpted_helm("res://assets/models/gear/helm_t2_sallet.glb", 2, false))
+		"helm_t3":
+			root_node.add_child(_build_sculpted_helm("res://assets/models/gear/helm_t3_sovereign.glb", 3, false))
+		"helm_t4":
+			root_node.add_child(_build_sculpted_helm("res://assets/models/gear/helm_t4_ashen.glb", 4, true))
 		"cuirass_plate":
-			root_node.add_child(_build_forged_cuirass())
+			root_node.add_child(_build_oathbreaker_slot_model(["Slot_Cuirass", "Slot_Pauldrons"], 3))
 	return root_node
 
 
@@ -833,249 +881,122 @@ func _orient_item_for_studio(key: String, orient: Node3D, raw_node: Node3D) -> v
 			v_right = -v_right
 		var align_basis := Basis(v_right, v_up, v_front).inverse()
 		raw_node.basis = align_basis * raw_node.basis
-		orient.rotation_degrees = Vector3(-8.0, -24.0, 4.0)
-	elif key in ["helm_iron", "helm_plume"]:
-		orient.rotation_degrees = Vector3(8.0, 26.0, 0.0)
+		orient.rotation_degrees = Vector3(6.0, 22.0, -4.0)
+	elif key in ["helm_iron", "helm_t3"]:
+		# Sculpted helms face +Z in GLB space; rotate past 180 deg toward the -X/-Z studio key light.
+		orient.rotation_degrees = Vector3(5.0, 206.0, 0.0)
+	elif key == "helm_t4":
+		orient.rotation_degrees = Vector3(-4.0, 196.0, 0.0)
+	elif key in ["helm_plume", "helm_t2"]:
+		orient.rotation_degrees = Vector3(5.0, 214.0, 0.0)
 	elif key == "cuirass_plate":
-		orient.rotation_degrees = Vector3(6.0, 20.0, 0.0)
-	elif key == "waist_lantern":
-		orient.rotation_degrees = Vector3(8.0, 28.0, -6.0)
+		orient.rotation_degrees = Vector3(6.0, 202.0, 0.0)
+	elif key.begins_with("waist_lantern"):
+		orient.rotation_degrees = Vector3(10.0, 32.0, -5.0)
 
 
-func _build_forged_greathelm(with_plume: bool) -> Node3D:
-	var helm := Node3D.new()
-
-	var steel_mat := StandardMaterial3D.new()
-	steel_mat.albedo_color = Color(0.24, 0.27, 0.33) if with_plume else Color(0.32, 0.33, 0.36)
-	steel_mat.metallic = 0.88
-	steel_mat.roughness = 0.26
-
-	var dark_slit_mat := StandardMaterial3D.new()
-	dark_slit_mat.albedo_color = Color(0.02, 0.02, 0.03)
-	dark_slit_mat.roughness = 0.95
-
-	var trim_mat := StandardMaterial3D.new()
-	trim_mat.albedo_color = Color(0.86, 0.66, 0.26) if with_plume else Color(0.58, 0.46, 0.28)
-	trim_mat.metallic = 0.92
-	trim_mat.roughness = 0.22
-
-	var barrel := MeshInstance3D.new()
-	var cyl := CylinderMesh.new()
-	cyl.top_radius = 0.205
-	cyl.bottom_radius = 0.225
-	cyl.height = 0.36
-	cyl.radial_segments = 32
-	barrel.mesh = cyl
-	barrel.material_override = steel_mat
-	helm.add_child(barrel)
-
-	var dome := MeshInstance3D.new()
-	var sph := SphereMesh.new()
-	sph.radius = 0.206
-	sph.height = 0.22
-	sph.is_hemisphere = true
-	dome.mesh = sph
-	dome.position = Vector3(0.0, 0.175, 0.0)
-	dome.material_override = steel_mat
-	helm.add_child(dome)
-
-	var brow := MeshInstance3D.new()
-	var brow_cyl := CylinderMesh.new()
-	brow_cyl.top_radius = 0.218
-	brow_cyl.bottom_radius = 0.220
-	brow_cyl.height = 0.048
-	brow_cyl.radial_segments = 32
-	brow.mesh = brow_cyl
-	brow.position = Vector3(0.0, 0.075, -0.008)
-	brow.material_override = trim_mat
-	helm.add_child(brow)
-
-	var nasal := MeshInstance3D.new()
-	var nasal_box := BoxMesh.new()
-	nasal_box.size = Vector3(0.044, 0.29, 0.036)
-	nasal.mesh = nasal_box
-	nasal.position = Vector3(0.0, -0.02, -0.218)
-	nasal.material_override = trim_mat
-	helm.add_child(nasal)
-
-	var eye_slit := MeshInstance3D.new()
-	var slit_box := BoxMesh.new()
-	slit_box.size = Vector3(0.28, 0.036, 0.06)
-	eye_slit.mesh = slit_box
-	eye_slit.position = Vector3(0.0, 0.035, -0.202)
-	eye_slit.material_override = dark_slit_mat
-	helm.add_child(eye_slit)
-
-	for side in [-1.0, 1.0]:
-		var cheek := MeshInstance3D.new()
-		var cbox := BoxMesh.new()
-		cbox.size = Vector3(0.11, 0.19, 0.045)
-		cheek.mesh = cbox
-		cheek.position = Vector3(side * 0.105, -0.085, -0.195)
-		cheek.rotation_degrees = Vector3(0.0, side * -18.0, 0.0)
-		cheek.material_override = steel_mat
-		helm.add_child(cheek)
-
-	var gorget := MeshInstance3D.new()
-	var gcyl := CylinderMesh.new()
-	gcyl.top_radius = 0.232
-	gcyl.bottom_radius = 0.275
-	gcyl.height = 0.08
-	gcyl.radial_segments = 32
-	gorget.mesh = gcyl
-	gorget.position = Vector3(0.0, -0.20, 0.0)
-	gorget.material_override = trim_mat if with_plume else steel_mat
-	helm.add_child(gorget)
-
-	var crest_ridge := MeshInstance3D.new()
-	var cr_box := BoxMesh.new()
-	cr_box.size = Vector3(0.038, 0.11, 0.34)
-	crest_ridge.mesh = cr_box
-	crest_ridge.position = Vector3(0.0, 0.24, 0.01)
-	crest_ridge.material_override = trim_mat
-	helm.add_child(crest_ridge)
-
-	if with_plume:
-		var plume_ps := load("res://assets/models/forged/helm_plume.glb") as PackedScene
-		if plume_ps != null:
-			var plume := plume_ps.instantiate() as Node3D
-			plume.position = Vector3(0.0, 0.26, 0.02)
-			plume.rotation_degrees = Vector3(0.0, 180.0, 0.0)
-			plume.scale = Vector3.ONE * 1.35
-			var pmat := StandardMaterial3D.new()
-			pmat.albedo_color = Color(0.72, 0.14, 0.14)
-			pmat.roughness = 0.68
-			for n in plume.find_children("*", "MeshInstance3D", true, false):
-				var pmi := n as MeshInstance3D
-				if pmi.mesh != null:
-					for s in pmi.mesh.get_surface_count():
-						var m := pmi.get_active_material(s)
-						if m != null and m.resource_name == "CrimsonAshenPlume":
-							pmi.set_surface_override_material(s, pmat)
-			helm.add_child(plume)
-
-	return helm
+func _boost_studio_emission(root_node: Node3D, min_energy: float) -> void:
+	for n in root_node.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		if mi.mesh == null:
+			continue
+		for s in mi.mesh.get_surface_count():
+			var mat := mi.get_active_material(s)
+			if mat is StandardMaterial3D and (mat as StandardMaterial3D).emission_texture != null:
+				var dup := (mat as StandardMaterial3D).duplicate() as StandardMaterial3D
+				dup.emission_enabled = true
+				dup.emission_energy_multiplier = maxf(dup.emission_energy_multiplier, min_energy)
+				mi.set_surface_override_material(s, dup)
 
 
-func _build_forged_cuirass() -> Node3D:
-	var root_armor := Node3D.new()
+func _build_sculpted_shield(key: String) -> Node3D:
+	var ps := load("res://assets/models/forged/gothic_shield.glb") as PackedScene
+	if ps == null:
+		return Node3D.new()
+	var inst := ps.instantiate() as Node3D
+	var tier := 1
+	var tint := Color(0.84, 0.80, 0.76)
+	var is_plate := false
+	if key == "shield_heater":
+		tier = 2
+		tint = Color(0.70, 0.78, 0.92)
+	elif key == "shield_tower":
+		tier = 3
+		tint = Color(1.08, 0.96, 0.76)
+		is_plate = true
 
-	var plate_mat := StandardMaterial3D.new()
-	plate_mat.albedo_color = Color(0.26, 0.29, 0.35)
-	plate_mat.metallic = 0.88
-	plate_mat.roughness = 0.25
+	var armor_shader := load(HeroRigDresser.ARMOR_SHADER_PATH) as Shader
+	if armor_shader != null:
+		for n in inst.find_children("*", "MeshInstance3D", true, false):
+			var mi := n as MeshInstance3D
+			if mi.mesh == null:
+				continue
+			for s in mi.mesh.get_surface_count():
+				var smat := HeroRigDresser._apply_armor_shader(mi, s, mi.get_active_material(s), armor_shader, tier, is_plate)
+				smat.set_shader_parameter("albedo_color", tint)
+	return inst
 
-	var dark_under := StandardMaterial3D.new()
-	dark_under.albedo_color = Color(0.11, 0.10, 0.12)
-	dark_under.metallic = 0.35
-	dark_under.roughness = 0.72
 
-	var gold_trim := StandardMaterial3D.new()
-	gold_trim.albedo_color = Color(0.84, 0.65, 0.26)
-	gold_trim.metallic = 0.92
-	gold_trim.roughness = 0.22
+func _build_sculpted_helm(glb_path: String, tier: int, boost_visor_emission: bool) -> Node3D:
+	var ps := load(glb_path) as PackedScene
+	if ps == null:
+		return Node3D.new()
+	var inst := ps.instantiate() as Node3D
+	if boost_visor_emission:
+		_boost_studio_emission(inst, 6.2)
+		return inst
 
-	var chest := MeshInstance3D.new()
-	var chest_cyl := CylinderMesh.new()
-	chest_cyl.top_radius = 0.285
-	chest_cyl.bottom_radius = 0.215
-	chest_cyl.height = 0.44
-	chest_cyl.radial_segments = 32
-	chest.mesh = chest_cyl
-	chest.scale = Vector3(1.20, 1.0, 0.72)
-	chest.position = Vector3(0.0, 0.12, 0.0)
-	chest.material_override = plate_mat
-	root_armor.add_child(chest)
+	var armor_shader := load(HeroRigDresser.ARMOR_SHADER_PATH) as Shader
+	if armor_shader != null:
+		for n in inst.find_children("*", "MeshInstance3D", true, false):
+			var mi := n as MeshInstance3D
+			if mi.mesh == null:
+				continue
+			for s in mi.mesh.get_surface_count():
+				HeroRigDresser._apply_armor_shader(mi, s, mi.get_active_material(s), armor_shader, tier, false)
+	return inst
 
-	var breast_dome := MeshInstance3D.new()
-	var bd_sph := SphereMesh.new()
-	bd_sph.radius = 0.29
-	bd_sph.height = 0.44
-	breast_dome.mesh = bd_sph
-	breast_dome.scale = Vector3(1.12, 0.92, 0.46)
-	breast_dome.position = Vector3(0.0, 0.16, -0.105)
-	breast_dome.material_override = plate_mat
-	root_armor.add_child(breast_dome)
 
-	for side in [-1.0, 1.0]:
-		var v_rib := MeshInstance3D.new()
-		var vr_box := BoxMesh.new()
-		vr_box.size = Vector3(0.22, 0.032, 0.045)
-		v_rib.mesh = vr_box
-		v_rib.position = Vector3(side * 0.11, 0.09, -0.205)
-		v_rib.rotation_degrees = Vector3(0.0, side * -18.0, side * -28.0)
-		v_rib.material_override = gold_trim
-		root_armor.add_child(v_rib)
+func _build_oathbreaker_slot_model(
+	visible_slots: Array[String],
+	armor_tier: int,
+	plume_col: Color = Color(0.82, 0.76, 0.64)
+) -> Node3D:
+	var ps := load("res://assets/models/kit/oathbreaker_knight.glb") as PackedScene
+	if ps == null:
+		return Node3D.new()
+	var inst := ps.instantiate() as Node3D
+	var armor_shader := load(HeroRigDresser.ARMOR_SHADER_PATH) as Shader
+	var cloak_shader := load(HeroRigDresser.CLOAK_SHADER_PATH) as Shader
 
-	var keel := MeshInstance3D.new()
-	var k_box := BoxMesh.new()
-	k_box.size = Vector3(0.036, 0.40, 0.045)
-	keel.mesh = k_box
-	keel.position = Vector3(0.0, 0.13, -0.222)
-	keel.material_override = gold_trim
-	root_armor.add_child(keel)
+	for n in inst.find_children("*", "MeshInstance3D", true, false):
+		var mi := n as MeshInstance3D
+		var nm := String(mi.name)
+		var keep := false
+		for slot_name in visible_slots:
+			if nm == slot_name or nm.begins_with(slot_name + "_") or nm.begins_with(slot_name + "."):
+				keep = true
+				break
+		mi.visible = keep
+		if not keep or mi.mesh == null:
+			continue
 
-	var collar := MeshInstance3D.new()
-	var col_torus := TorusMesh.new()
-	col_torus.inner_radius = 0.14
-	col_torus.outer_radius = 0.21
-	collar.mesh = col_torus
-	collar.scale = Vector3(1.15, 0.65, 0.85)
-	collar.position = Vector3(0.0, 0.34, 0.0)
-	collar.material_override = gold_trim
-	root_armor.add_child(collar)
+		if nm == "Slot_Plume" or nm.begins_with("Slot_Plume_"):
+			if cloak_shader != null:
+				var pmat := HeroRigDresser._make_cloak_shader_mat(cloak_shader, plume_col, plume_col.darkened(0.28), 0.0, -1.0)
+				for s in mi.mesh.get_surface_count():
+					mi.set_surface_override_material(s, pmat)
+			continue
 
-	for i in range(3):
-		var fauld := MeshInstance3D.new()
-		var f_cyl := CylinderMesh.new()
-		f_cyl.top_radius = 0.215 + float(i) * 0.022
-		f_cyl.bottom_radius = 0.232 + float(i) * 0.024
-		f_cyl.height = 0.075
-		f_cyl.radial_segments = 28
-		fauld.mesh = f_cyl
-		fauld.scale = Vector3(1.16, 1.0, 0.76)
-		fauld.position = Vector3(0.0, -0.11 - float(i) * 0.065, 0.0)
-		fauld.material_override = gold_trim if i == 0 else plate_mat
-		root_armor.add_child(fauld)
+		if armor_shader != null:
+			for s in mi.mesh.get_surface_count():
+				var orig_mat := mi.get_active_material(s)
+				var mname_low := orig_mat.resource_name.to_lower() if orig_mat != null else ""
+				if "neckcap" in mname_low or "undersuit" in mname_low:
+					continue
+				HeroRigDresser._apply_armor_shader(mi, s, orig_mat, armor_shader, armor_tier, true)
 
-	for side in [-1.0, 1.0]:
-		var tasset := MeshInstance3D.new()
-		var t_box := BoxMesh.new()
-		t_box.size = Vector3(0.18, 0.22, 0.045)
-		tasset.mesh = t_box
-		tasset.position = Vector3(side * 0.14, -0.34, -0.15)
-		tasset.rotation_degrees = Vector3(-8.0, side * -12.0, side * -6.0)
-		tasset.material_override = plate_mat
-		root_armor.add_child(tasset)
-
-	var pauldron_mesh: Mesh = load("res://assets/models/gear/pauldron_ancient.res") as Mesh if ResourceLoader.exists("res://assets/models/gear/pauldron_ancient.res") else null
-	if pauldron_mesh != null:
-		var p_box := pauldron_mesh.get_aabb()
-		var p_max := maxf(0.001, maxf(p_box.size.x, maxf(p_box.size.y, p_box.size.z)))
-		var p_scale := 0.34 / p_max
-		var p_center := p_box.position + p_box.size * 0.5
-		for side in [-1.0, 1.0]:
-			var p_piv := Node3D.new()
-			p_piv.position = Vector3(side * 0.34, 0.27, 0.0)
-			p_piv.scale = Vector3(side, 1.0, 1.0)
-			var p_mi := MeshInstance3D.new()
-			p_mi.mesh = pauldron_mesh
-			p_mi.scale = Vector3.ONE * p_scale
-			p_mi.position = -p_center * p_scale
-			p_piv.add_child(p_mi)
-			root_armor.add_child(p_piv)
-	else:
-		for side in [-1.0, 1.0]:
-			var sp := MeshInstance3D.new()
-			var sp_sph := SphereMesh.new()
-			sp_sph.radius = 0.16
-			sp_sph.height = 0.22
-			sp.mesh = sp_sph
-			sp.position = Vector3(side * 0.33, 0.27, 0.0)
-			sp.material_override = dark_under
-			root_armor.add_child(sp)
-
-	return root_armor
+	return inst
 
 
 static func _compute_node_aabb(root_3d: Node3D) -> AABB:

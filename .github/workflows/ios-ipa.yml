@@ -75,6 +75,8 @@ jobs:
         run: |
           set -euo pipefail
           "$GODOT" --headless --path . --script res://tests/run_all_tests.gd
+          "$GODOT" --headless --path . --script res://tests/test_combat_slice.gd
+          "$GODOT" --headless --path . --script res://tests/test_modular_equipment.gd
 
       - name: Export the Xcode project
         timeout-minutes: 30

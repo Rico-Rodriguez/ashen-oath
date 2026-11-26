@@ -190,9 +190,9 @@ func spawn_blackflame_pyre(pos: Vector3, radius: float = 3.2) -> void:
 	var pillar_layers: Array[Dictionary] = []
 	if _flame_shader != null:
 		var specs := [
-			{"w": r * 1.32, "h": 5.8, "y": 2.85, "soot": 0.84, "core": Vector3(3.8, 1.45, 0.24), "spd": 2.6, "nsc": 4.4, "prio": 0},
-			{"w": r * 0.90, "h": 4.3, "y": 2.08, "soot": 0.36, "core": Vector3(6.8, 3.1, 0.68), "spd": 3.3, "nsc": 5.0, "prio": 1},
-			{"w": r * 0.58, "h": 2.85, "y": 1.38, "soot": 0.08, "core": Vector3(8.8, 4.6, 1.25), "spd": 4.1, "nsc": 5.6, "prio": 2},
+			{"w": r * 1.18, "h": 4.3, "y": 2.10, "soot": 0.54, "alpha_boost": 0.78, "core": Vector3(3.8, 1.45, 0.24), "spd": 2.6, "nsc": 4.4, "prio": 0},
+			{"w": r * 0.90, "h": 4.3, "y": 2.08, "soot": 0.30, "alpha_boost": 1.10, "core": Vector3(6.8, 3.1, 0.68), "spd": 3.3, "nsc": 5.0, "prio": 1},
+			{"w": r * 0.58, "h": 2.85, "y": 1.38, "soot": 0.08, "alpha_boost": 1.22, "core": Vector3(8.8, 4.6, 1.25), "spd": 4.1, "nsc": 5.6, "prio": 2},
 		]
 		for s_i in specs.size():
 			var sp: Dictionary = specs[s_i]
@@ -201,6 +201,8 @@ func spawn_blackflame_pyre(pos: Vector3, radius: float = 3.2) -> void:
 			fmat.render_priority = int(sp["prio"])
 			fmat.set_shader_parameter("billboard_mode", true)
 			fmat.set_shader_parameter("soot_dominance", float(sp["soot"]))
+			fmat.set_shader_parameter("soot_color", Color(0.055, 0.042, 0.052))
+			fmat.set_shader_parameter("alpha_boost", float(sp["alpha_boost"]))
 			fmat.set_shader_parameter("core_hdr", sp["core"] as Vector3)
 			fmat.set_shader_parameter("scroll_speed", float(sp["spd"]))
 			fmat.set_shader_parameter("noise_scale", float(sp["nsc"]))
@@ -211,16 +213,16 @@ func spawn_blackflame_pyre(pos: Vector3, radius: float = 3.2) -> void:
 			fmi.position = Vector3(0.0, float(sp["y"]), 0.0)
 			fmi.material_override = fmat
 			pyre.add_child(fmi)
-			pillar_layers.append({"mi": fmi, "mat": fmat, "base_y": float(sp["y"])})
+			pillar_layers.append({"mi": fmi, "mat": fmat, "base_y": float(sp["y"]), "alpha_boost": float(sp["alpha_boost"])})
 
 		var smoke_mat := ShaderMaterial.new()
 		smoke_mat.shader = _flame_shader
 		smoke_mat.set_shader_parameter("billboard_mode", true)
-		smoke_mat.set_shader_parameter("soot_dominance", 0.84)
+		smoke_mat.set_shader_parameter("soot_dominance", 0.62)
 		smoke_mat.set_shader_parameter("core_hdr", Vector3(3.6, 1.3, 0.22))
 		smoke_mat.set_shader_parameter("mid_flame", Vector3(1.5, 0.35, 0.06))
-		smoke_mat.set_shader_parameter("soot_color", Color(0.014, 0.012, 0.018))
-		smoke_mat.set_shader_parameter("alpha_boost", 1.35)
+		smoke_mat.set_shader_parameter("soot_color", Color(0.055, 0.042, 0.052))
+		smoke_mat.set_shader_parameter("alpha_boost", 0.55)
 
 		var smoke_proc := ParticleProcessMaterial.new()
 		smoke_proc.emission_shape = ParticleProcessMaterial.EMISSION_SHAPE_RING
@@ -335,7 +337,7 @@ func spawn_blackflame_pyre(pos: Vector3, radius: float = 3.2) -> void:
 			if is_instance_valid(mi):
 				mi.scale = Vector3(lerpf(0.55, 1.08, erupt), lerpf(0.25, 1.05, erupt), 1.0)
 				mi.position.y = float(layer["base_y"]) * lerpf(0.3, 1.0, erupt)
-				mat.set_shader_parameter("alpha_boost", 1.22 * env_curve)
+				mat.set_shader_parameter("alpha_boost", float(layer["alpha_boost"]) * env_curve)
 	)
 
 

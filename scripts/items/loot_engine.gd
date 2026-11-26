@@ -195,9 +195,11 @@ static func compute_combat_stats(
 		base_hp += float(h_stats["hp"]) * h_mult
 		stats.helm_tier = clampi(helm_item.tier, 1, 4)
 		stats.has_plume = helm_item.has_plume
+		stats.helm_key = _resolve_slot_visual_key(helm_item.base_id, "helm_t", stats.helm_tier)
 	else:
 		stats.helm_tier = 0
 		stats.has_plume = false
+		stats.helm_key = ""
 
 	if cuirass_item != null:
 		var c_mult := cuirass_item.temper_multiplier()
@@ -205,12 +207,18 @@ static func compute_combat_stats(
 		armor += float(c_stats["armor"]) * c_mult
 		base_hp += float(c_stats["hp"]) * c_mult
 		stats.armor_tier = clampi(cuirass_item.tier, 1, 4)
+		stats.cuirass_tier = stats.armor_tier
+		stats.cuirass_key = _resolve_slot_visual_key(cuirass_item.base_id, "cuirass_t", stats.cuirass_tier)
 	else:
 		stats.armor_tier = 0
+		stats.cuirass_tier = 0
+		stats.cuirass_key = ""
 
 	if lantern_item != null:
 		var l_mult := lantern_item.temper_multiplier()
-		var l_tier := float(clampi(lantern_item.tier, 1, 4))
+		var l_tier_int := clampi(lantern_item.tier, 1, 4)
+		var l_tier := float(l_tier_int)
+		stats.lantern_tier = l_tier_int
 		stats.lantern_aspect = lantern_item.lantern_aspect
 		stats.lantern_color = GameEnums.lantern_color(lantern_item.lantern_aspect)
 		match lantern_item.lantern_aspect:
@@ -224,6 +232,7 @@ static func compute_combat_stats(
 				crit_chance += (0.03 + 0.02 * l_tier) * l_mult
 				crit_mult += (0.12 + 0.08 * l_tier) * l_mult
 	else:
+		stats.lantern_tier = 1
 		stats.lantern_aspect = resolved_hero.starter_lantern
 		stats.lantern_color = GameEnums.lantern_color(resolved_hero.starter_lantern)
 
@@ -289,6 +298,14 @@ static func compute_combat_stats(
 
 static func _extract_slot_item(equipped: Dictionary, slot: GameEnums.Slot) -> EquipmentItem:
 	return equipped.get(slot) as EquipmentItem
+
+
+static func _resolve_slot_visual_key(base_id: String, tier_prefix: String, tier: int) -> String:
+	if base_id != "":
+		if base_id == "%s1" % tier_prefix:
+			return ""
+		return base_id
+	return "%s%d" % [tier_prefix, tier] if tier >= 2 else ""
 
 
 static func _roll_tier(rng: RandomNumberGenerator, cap_tier: int, difficulty: GameEnums.Difficulty) -> int:

@@ -146,6 +146,10 @@ func get_combat_stats(class_id: String = "", blessings: Array = []) -> CombatSta
 	return LootEngine.compute_combat_stats(hdef, eq, blessings)
 
 
+func compute_stats(class_id: String = "", blessings: Array = []) -> CombatStats:
+	return get_combat_stats(class_id, blessings)
+
+
 func get_item(item_uid: String) -> EquipmentItem:
 	if item_uid == "":
 		return null

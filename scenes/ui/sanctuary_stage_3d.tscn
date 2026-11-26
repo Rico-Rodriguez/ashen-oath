@@ -1,22 +1,32 @@
-[gd_scene load_steps=4 format=3]
+[gd_scene load_steps=7 format=3]
 
 [ext_resource type="Script" path="res://scripts/ui/sanctuary_stage_3d.gd" id="1"]
 [ext_resource type="FontFile" path="res://assets/fonts/Cinzel-Variable.ttf" id="2"]
+[ext_resource type="Shader" path="res://shaders/sky_cathedral_ibl.gdshader" id="3"]
+
+[sub_resource type="ShaderMaterial" id="ShaderMaterial_sky"]
+shader = ExtResource("3")
+
+[sub_resource type="Sky" id="Sky_cathedral"]
+sky_material = SubResource("ShaderMaterial_sky")
 
 [sub_resource type="Environment" id="Environment_sanctuary"]
-background_mode = 1
-background_color = Color(0.032, 0.038, 0.052, 1)
-ambient_light_source = 2
-ambient_light_color = Color(0.28, 0.32, 0.42, 1)
-ambient_light_energy = 0.92
+background_mode = 2
+sky = SubResource("Sky_cathedral")
+ambient_light_source = 3
+ambient_light_sky_contribution = 0.85
+ambient_light_energy = 0.82
+reflected_light_source = 2
 tonemap_mode = 3
+tonemap_exposure = 1.08
 glow_enabled = true
-glow_intensity = 0.52
-glow_bloom = 0.10
+glow_intensity = 0.35
+glow_bloom = 0.08
 glow_hdr_threshold = 1.15
 fog_enabled = true
-fog_light_color = Color(0.055, 0.068, 0.095, 1)
-fog_density = 0.042
+fog_light_color = Color(0.07, 0.08, 0.12, 1)
+fog_density = 0.014
+fog_sky_affect = 0.45
 
 [node name="SanctuaryStage3D" type="PanelContainer"]
 clip_contents = true
@@ -55,13 +65,13 @@ environment = SubResource("Environment_sanctuary")
 [node name="KeyLight" type="DirectionalLight3D" parent="ViewportStack/SubViewportContainer/SubViewport"]
 transform = Transform3D(0.819152, -0.346189, 0.457392, 0, 0.797132, 0.603804, -0.573576, -0.494608, 0.652972, -2.4, 3.8, -3.2)
 light_color = Color(1, 0.91, 0.78, 1)
-light_energy = 2.05
+light_energy = 1.75
 shadow_enabled = true
 
 [node name="MoonRim" type="DirectionalLight3D" parent="ViewportStack/SubViewportContainer/SubViewport"]
 transform = Transform3D(-0.766044, 0.383022, -0.51621, 0, 0.803056, 0.595903, 0.642788, 0.456488, -0.615176, 2.5, 3.2, 3.1)
 light_color = Color(0.52, 0.68, 0.98, 1)
-light_energy = 1.45
+light_energy = 1.55
 
 [node name="StageRoot" type="Node3D" parent="ViewportStack/SubViewportContainer/SubViewport"]
 

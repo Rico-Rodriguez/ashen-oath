@@ -8,6 +8,7 @@ script = ExtResource("1")
 actor_id = "hollow_ghoul"
 height_meters = 1.72
 yaw_offset_deg = 180.0
+weapon_key = "bastardsword"
 
 [node name="ModelPivot" type="Node3D" parent="."]
 

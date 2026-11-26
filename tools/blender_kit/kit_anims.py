@@ -25,11 +25,58 @@ def _set_anat_rot(
     pitch_x_deg: float = 0.0,
     yaw_y_deg: float = 0.0,
     roll_z_deg: float = 0.0,
+    pre_roll_z_deg: float = 0.0,
 ) -> None:
     pb = arm_obj.pose.bones[bone_name]
     q_rest = pb.bone.matrix_local.to_3x3().to_quaternion()
     q_anat = _gd_euler_quat(pitch_x_deg, yaw_y_deg, roll_z_deg)
+    if abs(pre_roll_z_deg) > 1e-4:
+        q_pre = _gd_euler_quat(0.0, 0.0, pre_roll_z_deg)
+        q_anat = q_anat @ q_pre
     pb.rotation_quaternion = q_rest.inverted() @ q_anat @ q_rest
+
+
+def _measure_apose_calibration(
+    arm_obj: bpy.types.Object,
+    scale: float,
+    rest_arm_roll_deg: float | None = None,
+) -> dict[str, float]:
+    def _arm_abduction(bname: str, side_sign: float) -> float:
+        b = arm_obj.data.bones.get(bname)
+        if b is None:
+            return 12.0
+        d_bl = b.tail_local - b.head_local
+        d_gd = Vector((d_bl.x, d_bl.z, -d_bl.y))
+        return math.degrees(math.atan2(max(0.0, side_sign * d_gd.x), max(1e-4, -d_gd.y)))
+
+    abd_l = _arm_abduction("upper_arm_l", 1.0)
+    abd_r = _arm_abduction("upper_arm_r", -1.0)
+    if rest_arm_roll_deg is not None:
+        comp_l = -max(0.0, min(55.0, rest_arm_roll_deg - 15.0))
+        comp_r = max(0.0, min(55.0, rest_arm_roll_deg - 15.0))
+    else:
+        # Leave MASTER_BONES (~12 deg) untouched; compensate splayed ~30-45 deg A-pose sculpts cleanly.
+        comp_l = -max(0.0, min(55.0, abd_l - 15.5)) if abd_l > 17.5 else 0.0
+        comp_r = max(0.0, min(55.0, abd_r - 15.5)) if abd_r > 17.5 else 0.0
+
+    fl = arm_obj.data.bones.get("foot_l")
+    fr = arm_obj.data.bones.get("foot_r")
+    rest_ankle_y = 0.10 * scale
+    foot_rest_slope_y = -0.457
+    if fl is not None and fr is not None:
+        rest_ankle_y = 0.5 * (float(fl.head_local.z) + float(fr.head_local.z))
+        fv_bl = fl.tail_local - fl.head_local
+        fv_gd = Vector((fv_bl.x, fv_bl.z, -fv_bl.y))
+        horiz = math.hypot(fv_gd.x, fv_gd.z)
+        if horiz > 1e-4:
+            foot_rest_slope_y = fv_gd.y / horiz
+
+    return {
+        "comp_l": comp_l,
+        "comp_r": comp_r,
+        "ankle_y_delta": rest_ankle_y - 0.10 * scale,
+        "foot_rest_slope_y": foot_rest_slope_y,
+    }
 
 
 def _aim_bone_world(
@@ -174,9 +221,17 @@ def _apply_pose_sample(
     scale: float,
     weapon_style: str,
     weapon_len: float,
+    calib: dict[str, float] | None = None,
 ) -> None:
     _reset_pose(arm_obj)
     tau = 2.0 * math.pi
+    if calib is None:
+        calib = {"comp_l": 0.0, "comp_r": 0.0, "ankle_y_delta": 0.0, "foot_rest_slope_y": -0.457}
+    comp_l = calib["comp_l"]
+    comp_r = calib["comp_r"]
+    ankle_y_delta = calib["ankle_y_delta"]
+    foot_slope_y = calib["foot_rest_slope_y"]
+    is_apose = abs(comp_l) > 0.5 or abs(comp_r) > 0.5
 
     # Default upright combat guard values; every clip overrides explicitly.
     hips_off = (0.0, -0.075, 0.0)
@@ -203,8 +258,10 @@ def _apply_pose_sample(
 
     foot_l = Vector((0.18, 0.10, 0.22)) * scale
     foot_r = Vector((-0.20, 0.10, -0.18)) * scale
-    foot_fwd_l = Vector((0.15, 0.0, 1.0))
-    foot_fwd_r = Vector((-0.22, 0.0, 0.95))
+    flat_y_l = foot_slope_y * math.hypot(0.15, 1.0) if is_apose else 0.0
+    flat_y_r = foot_slope_y * math.hypot(-0.22, 0.95) if is_apose else 0.0
+    foot_fwd_l = Vector((0.15, flat_y_l, 1.0))
+    foot_fwd_r = Vector((-0.22, flat_y_r, 0.95))
 
     weapon_dir = Vector((-0.30, -0.60, -0.74))
     weapon_tip_y: float | None = None
@@ -225,9 +282,11 @@ def _apply_pose_sample(
         hd_l = (0.0, -6.0, 0.0)
         ua_r = (-6.0 + 2.0 * br, -8.0, -10.0 - 1.5 * br)
         fa_r = (-22.0 + 2.5 * br, 0.0, 2.0)
-        hd_r = (44.0, -20.0, 0.0)
-        foot_fwd_l = Vector((0.15, -0.462, 1.0))
-        foot_fwd_r = Vector((-0.22, -0.446, 0.95))
+        hd_r = (20.0, -12.0, 0.0) if is_apose else (44.0, -20.0, 0.0)
+        idle_fy_l = foot_slope_y * math.hypot(0.15, 1.0) if is_apose else -0.462
+        idle_fy_r = foot_slope_y * math.hypot(-0.22, 0.95) if is_apose else -0.446
+        foot_fwd_l = Vector((0.15, idle_fy_l, 1.0))
+        foot_fwd_r = Vector((-0.22, idle_fy_r, 0.95))
 
         cape0 = (12.0 + 3.5 * br2, 0.0, 2.0 * math.cos(u * tau))
         cape1 = (7.0 + 4.5 * math.sin(u * tau - 1.4), 0.0, 3.0 * math.cos(u * tau - 0.8))
@@ -241,15 +300,15 @@ def _apply_pose_sample(
             weapon_dir = Vector((-0.56, -0.64, 0.52))
             weapon_tip_y = (0.24 + 0.02 * br) * scale
         elif weapon_style == "staff":
-            ua_r = (-24.0 + 2.0 * br, -8.0, -22.0)
-            fa_r = (-46.0 + 3.0 * br, 0.0, 4.0)
-            hd_r = (8.0, 0.0, 0.0)
-            weapon_dir = Vector((-0.26, 0.72, 0.64))
+            ua_r = (-32.0 + 2.0 * br, 12.0, -4.0 - 1.0 * br)
+            fa_r = (-54.0 + 3.0 * br, 10.0, 8.0)
+            hd_r = (10.0, 0.0, 0.0)
+            weapon_dir = Vector((-0.08, 0.94, 0.33))
         elif weapon_style == "halberd":
-            ua_r = (-18.0 + 2.0 * br, -10.0, -24.0)
-            fa_r = (-44.0 + 3.0 * br, 0.0, 4.0)
-            hd_r = (8.0, 0.0, 0.0)
-            weapon_dir = Vector((-0.22, 0.78, 0.58))
+            ua_r = (-28.0 + 2.0 * br, 6.0, -11.0 - 1.0 * br)
+            fa_r = (-50.0 + 3.0 * br, 6.0, 6.0)
+            hd_r = (10.0, 0.0, 0.0)
+            weapon_dir = Vector((-0.14, 0.92, 0.36))
 
     elif clip == "run":
         ph = u * tau
@@ -287,12 +346,13 @@ def _apply_pose_sample(
         z_r = -math.cos(ph) * stride_z
         foot_l = Vector((0.14, 0.10 + lift_l, z_l)) * scale
         foot_r = Vector((-0.14, 0.10 + lift_r, z_r)) * scale
-        foot_fwd_l = Vector((0.0, -0.35 * max(0.0, -math.sin(ph)), 1.0))
-        foot_fwd_r = Vector((0.0, -0.35 * max(0.0, math.sin(ph)), 1.0))
+        base_run_fy = foot_slope_y if is_apose else 0.0
+        foot_fwd_l = Vector((0.0, base_run_fy - 0.35 * max(0.0, -math.sin(ph)), 1.0))
+        foot_fwd_r = Vector((0.0, base_run_fy - 0.35 * max(0.0, math.sin(ph)), 1.0))
 
-        cape0 = (32.0 + 6.0 * c, 0.0, 4.0 * s)
-        cape1 = (18.0 + 8.0 * math.sin(ph - 0.8), 0.0, 6.0 * math.cos(ph - 0.6))
-        cape2 = (12.0 + 10.0 * math.sin(ph - 1.6), 0.0, 8.0 * math.cos(ph - 1.2))
+        cape0 = (15.0 + 5.0 * c, 0.0, 4.0 * s) if is_apose else (32.0 + 6.0 * c, 0.0, 4.0 * s)
+        cape1 = (10.0 + 6.0 * math.sin(ph - 0.8), 0.0, 5.0 * math.cos(ph - 0.6)) if is_apose else (18.0 + 8.0 * math.sin(ph - 0.8), 0.0, 6.0 * math.cos(ph - 0.6))
+        cape2 = (7.0 + 7.0 * math.sin(ph - 1.6), 0.0, 6.0 * math.cos(ph - 1.2)) if is_apose else (12.0 + 10.0 * math.sin(ph - 1.6), 0.0, 8.0 * math.cos(ph - 1.2))
         lantern_rot = (18.0 + 8.0 * c, 0.0, 10.0 * s)
 
     elif clip == "attack_1":
@@ -510,9 +570,9 @@ def _apply_pose_sample(
             weapon_dir = Vector((-0.28, 0.35, 0.88))
         foot_l = Vector((0.18, 0.10, 0.36 * lunge + 0.18)) * scale
         foot_r = Vector((-0.18, 0.10 + 0.10 * lunge, -0.34 * lunge - 0.14)) * scale
-        cape0 = (48.0 * lunge + 14.0, 0.0, 0.0)
-        cape1 = (30.0 * lunge + 8.0, 0.0, 0.0)
-        cape2 = (22.0 * lunge + 6.0, 0.0, 0.0)
+        cape0 = (18.0 * lunge + 10.0, 0.0, 0.0) if is_apose else (48.0 * lunge + 14.0, 0.0, 0.0)
+        cape1 = (12.0 * lunge + 6.0, 0.0, 0.0) if is_apose else (30.0 * lunge + 8.0, 0.0, 0.0)
+        cape2 = (8.0 * lunge + 4.0, 0.0, 0.0) if is_apose else (22.0 * lunge + 6.0, 0.0, 0.0)
 
     elif clip == "hit":
         snap = math.sin(min(1.0, u * 1.25) * math.pi)
@@ -569,13 +629,13 @@ def _apply_pose_sample(
     _set_anat_rot(arm_obj, "head", *head_rot)
 
     _set_anat_rot(arm_obj, "shoulder_l", *sh_l)
-    _set_anat_rot(arm_obj, "upper_arm_l", *ua_l)
+    _set_anat_rot(arm_obj, "upper_arm_l", *ua_l, pre_roll_z_deg=comp_l)
     _set_anat_rot(arm_obj, "forearm_l", *fa_l)
     _set_anat_rot(arm_obj, "hand_l", *hd_l)
 
     _set_anat_rot(arm_obj, "shoulder_r", *sh_r)
     if ua_r is not None:
-        _set_anat_rot(arm_obj, "upper_arm_r", *ua_r)
+        _set_anat_rot(arm_obj, "upper_arm_r", *ua_r, pre_roll_z_deg=comp_r)
     else:
         # Aim upper_arm_r in world space during mid-cleave so arm stays level across chest!
         bpy.context.view_layer.update()
@@ -587,6 +647,10 @@ def _apply_pose_sample(
     _set_anat_rot(arm_obj, "cape_1", *cape1)
     _set_anat_rot(arm_obj, "cape_2", *cape2)
     _set_anat_rot(arm_obj, "lantern_bone", *lantern_rot)
+
+    if abs(ankle_y_delta) > 1e-4:
+        foot_l = Vector((foot_l.x, foot_l.y + ankle_y_delta, foot_l.z))
+        foot_r = Vector((foot_r.x, foot_r.y + ankle_y_delta, foot_r.z))
 
     if clip == "attack_whirl":
         # Rotate leg targets and weapon_dir with root spin yaw so the crouched knight spins cleanly as a unit.
@@ -623,8 +687,10 @@ def bake_master_animations(
     scale: float = 1.0,
     weapon_style: str = "greatsword",
     weapon_len: float = 1.35,
+    rest_arm_roll_deg: float | None = None,
 ) -> list[str]:
     bpy.context.scene.render.fps = 60
+    calib = _measure_apose_calibration(arm_obj, scale, rest_arm_roll_deg=rest_arm_roll_deg)
     arm_obj.animation_data_create()
     while len(arm_obj.animation_data.nla_tracks) > 0:
         arm_obj.animation_data.nla_tracks.remove(arm_obj.animation_data.nla_tracks[0])
@@ -660,7 +726,7 @@ def bake_master_animations(
             u = min(1.0, max(0.0, (f - 1) / float(total_frames)))
             if is_loop and f == total_frames + 1:
                 u = 0.0
-            _apply_pose_sample(arm_obj, name, u, scale, weapon_style, weapon_len)
+            _apply_pose_sample(arm_obj, name, u, scale, weapon_style, weapon_len, calib=calib)
             _key_all_bones(arm_obj, f)
 
         slot = arm_obj.animation_data.action_slot

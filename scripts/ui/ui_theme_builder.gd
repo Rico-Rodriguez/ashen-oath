@@ -114,11 +114,26 @@ static func get_item_icon(item: EquipmentItem) -> Texture2D:
 				wdef = GameRegistry.get_weapon_by_type_and_tier(item.weapon_type, item.tier)
 			key = wdef.mesh_key if wdef != null and wdef.mesh_key != "" else "zweihander"
 		GameEnums.Slot.HELM:
-			key = "helm_plume" if item.has_plume else "helm_iron"
+			if item.base_id == "helm_t4" or item.tier >= 4:
+				key = "helm_t4"
+			elif item.base_id == "helm_t3" or item.tier == 3:
+				key = "helm_t3"
+			elif item.base_id == "helm_t2" or item.tier == 2:
+				key = "helm_t2"
+			else:
+				key = "helm_plume" if item.has_plume else "helm_iron"
 		GameEnums.Slot.CUIRASS:
 			key = "cuirass_plate"
 		GameEnums.Slot.LANTERN:
-			key = "waist_lantern"
+			match item.lantern_aspect:
+				GameEnums.LanternAspect.SOUL_BLUE:
+					key = "waist_lantern_soul"
+				GameEnums.LanternAspect.BLIGHT_GREEN:
+					key = "waist_lantern_blight"
+				GameEnums.LanternAspect.BLOOD_CRIMSON:
+					key = "waist_lantern_blood"
+				_:
+					key = "waist_lantern"
 	return get_item_icon_by_key(key)
 
 
@@ -147,22 +162,44 @@ static func get_safe_margins(viewport_node: Control) -> Dictionary:
 	var left := 0
 	var right := 0
 	var win_size := DisplayServer.window_get_size()
+	var screen_size := DisplayServer.screen_get_size()
 	var safe := DisplayServer.get_display_safe_area()
 	var vp_size := Vector2(720.0, 1280.0)
 	if viewport_node != null and viewport_node.get_viewport() != null:
 		var r := viewport_node.get_viewport().get_visible_rect()
 		if r.size.x > 0.0 and r.size.y > 0.0:
 			vp_size = r.size
-	if win_size.x > 0 and win_size.y > 0 and safe.size.x > 0 and safe.size.y > 0:
-		var sx := vp_size.x / float(win_size.x)
-		var sy := vp_size.y / float(win_size.y)
-		left = maxi(0, ceili(float(safe.position.x) * sx))
-		top = maxi(0, ceili(float(safe.position.y) * sy))
-		right = maxi(0, ceili(float(win_size.x - safe.end.x) * sx))
-		bottom = maxi(0, ceili(float(win_size.y - safe.end.y) * sy))
-	if OS.get_name() == "iOS":
-		top = maxi(top, 46)
-		bottom = maxi(bottom, 24)
+
+	var is_ios := OS.get_name() == "iOS"
+	var space_w := float(win_size.x)
+	var space_h := float(win_size.y)
+	if is_ios and screen_size.x > 0 and screen_size.y > 0:
+		if (vp_size.y >= vp_size.x) == (screen_size.y >= screen_size.x):
+			space_w = float(screen_size.x)
+			space_h = float(screen_size.y)
+		else:
+			space_w = float(screen_size.y)
+			space_h = float(screen_size.x)
+	if safe.size.x > 0 and safe.size.y > 0:
+		space_w = maxf(space_w, float(safe.end.x))
+		space_h = maxf(space_h, float(safe.end.y))
+		if space_w > 0.0 and space_h > 0.0:
+			var sx := vp_size.x / space_w
+			var sy := vp_size.y / space_h
+			left = maxi(0, ceili(float(safe.position.x) * sx))
+			top = maxi(0, ceili(float(safe.position.y) * sy))
+			right = maxi(0, ceili((space_w - float(safe.end.x)) * sx))
+			bottom = maxi(0, ceili((space_h - float(safe.end.y)) * sy))
+
+	if vp_size.y >= vp_size.x:
+		top = clampi(top, 40, 64) if is_ios else clampi(top, 0, 64)
+		bottom = clampi(bottom, 18, 36) if is_ios else clampi(bottom, 0, 36)
+		left = clampi(left, 0, 48)
+		right = clampi(right, 0, 48)
+	elif is_ios:
+		top = clampi(top, 0, 32)
+		bottom = clampi(bottom, 16, 28)
+
 	return {"top": top, "bottom": bottom, "left": left, "right": right}
 
 

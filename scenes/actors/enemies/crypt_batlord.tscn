@@ -8,6 +8,7 @@ script = ExtResource("1")
 actor_id = "crypt_batlord"
 height_meters = 1.82
 yaw_offset_deg = 180.0
+weapon_key = "runed_staff"
 
 [node name="ModelPivot" type="Node3D" parent="."]
 

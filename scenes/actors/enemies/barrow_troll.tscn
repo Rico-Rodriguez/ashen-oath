@@ -8,6 +8,7 @@ script = ExtResource("1")
 actor_id = "barrow_troll"
 height_meters = 3.15
 yaw_offset_deg = 180.0
+weapon_key = "warden_greatsword"
 emission_tint = Color(1, 0.36, 0.08, 1)
 emission_energy = 2.4
 

@@ -4,7 +4,7 @@ render_mode unshaded, blend_mix, depth_draw_never, cull_disabled;
 uniform bool billboard_mode = true;
 uniform vec3 core_hdr = vec3(6.2, 2.8, 0.62);
 uniform vec3 mid_flame = vec3(2.4, 0.55, 0.10);
-uniform vec3 soot_color : source_color = vec3(0.015, 0.012, 0.018);
+uniform vec3 soot_color : source_color = vec3(0.055, 0.042, 0.052);
 uniform float soot_dominance : hint_range(0.0, 1.0) = 0.48;
 uniform float scroll_speed = 2.8;
 uniform float noise_scale = 4.6;
@@ -77,8 +77,8 @@ void fragment() {
 
 	float shape = (1.0 - dist) + (turb - 0.48) * 0.86 + (wisps - 0.5) * 0.30;
 	float erode = mix(0.10, 0.62, v_life);
-	float uv_edge = smoothstep(0.0, 0.14, UV.x) * smoothstep(1.0, 0.86, UV.x) * smoothstep(0.0, 0.10, UV.y) * smoothstep(1.0, 0.84, UV.y);
-	float alpha_mask = smoothstep(erode, erode + 0.24, shape) * uv_edge;
+	float uv_edge = smoothstep(0.0, 0.22, UV.x) * smoothstep(1.0, 0.78, UV.x) * smoothstep(0.0, 0.28, UV.y) * smoothstep(1.0, 0.88, UV.y);
+	float alpha_mask = smoothstep(erode, erode + 0.50, shape) * uv_edge;
 
 	float soot_zone = clamp(height_01 * 0.62 + v_life * 0.65 + soot_dominance * 0.72 + (1.0 - turb) * 0.22, 0.0, 1.0);
 	float center_boost = (1.0 - smoothstep(0.05, 0.38, abs(centered.x * pinch))) * (1.0 - height_01 * 0.55) * (1.0 - soot_dominance);
@@ -92,6 +92,8 @@ void fragment() {
 	float ember_vein = smoothstep(erode + 0.03, erode + 0.11, shape) * (1.0 - smoothstep(erode + 0.11, erode + 0.20, shape));
 	col += mid_flame * ember_vein * (0.95 * (1.0 - soot_dominance * 0.55));
 
+	float fire_w = clamp(max(mid_w, core_w), 0.0, 1.0);
+	float max_alpha = mix(0.38, 0.92, fire_w);
 	ALBEDO = col * COLOR.rgb;
-	ALPHA = clamp(alpha_mask * alpha_boost * COLOR.a, 0.0, 0.96);
+	ALPHA = clamp(alpha_mask * max_alpha * alpha_boost * COLOR.a, 0.0, max_alpha);
 }
